@@ -142,6 +142,7 @@ src/
       api/              everything that talks to the network
       constants/        values the feature is configured by, not logic
       model/            logic with no JSX. Most of the tests point here
+        hooks/          the React bindings over it, which a test cannot reach
       ui/               components
       index.ts          the only file the outside may import
   shared/
@@ -206,8 +207,10 @@ handling live there too. If a component knows a URL, the layering has already br
 
 **4. `model/` holds logic with no JSX.** The storage overlay, the URL to query mapping, the
 schemas, the sort comparator. It is testable precisely because it does not need a rendered
-component. When you are about to put logic inside a component, check whether it belongs
-here instead.
+component, so a file whose whole job is calling hooks belongs in `model/hooks/` instead.
+`userEdits.ts` stays put because it is a store that happens to expose one hook, and moving
+it would describe it wrongly. When you are about to put logic inside a component, check
+whether it belongs here first.
 
 **5. Two levels inside a feature at most, and no folder holding a single file.** If you
 need a third level, the feature probably wants splitting in two. A folder with one file in

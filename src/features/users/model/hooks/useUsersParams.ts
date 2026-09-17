@@ -1,26 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useUrlParams } from '@/shared/lib/useUrlParams';
-import type { UsersQuery } from './types';
-import { DEFAULT_QUERY, parseUsersQuery, usersQueryToParams } from './usersParams';
+import type { UsersQuery } from '../types';
+import { DEFAULT_QUERY, parseUsersQuery, usersQueryToParams } from '../usersParams';
 
 /**
- * Which changes get their own history entry.
- *
- * Every deliberate decision pushes, so back undoes it. Picking a city, toggling the sort,
- * turning a page and changing the page size are each one choice.
- *
- * Search is the only thing that is not a single choice, and it needs a finer rule than
- * "always" or "never". Pushing on every pause in the typing would put "l", "le" and "lea"
- * in history and take twenty presses of back to leave. Never pushing means a user who
- * searched cannot get back to the full list the way they expect.
- *
- * So what counts is whether this is the same term still being written. Typing further
- * into it, or backspacing over it, is one search being composed and replaces. Anything
- * else is a new search and pushes, including the first one and clearing it again.
- *
- * The earlier rule only asked whether a search existed before and after, which made
- * "Leanne" to "Ervin" look like more typing, so three searches collapsed into one entry
- * and one press of back threw away all three.
+ * Which changes get their own history entry. Every deliberate choice pushes, so back
+ * undoes it. Search is the exception: typing further into a term, or backspacing over it,
+ * is one search being composed and replaces. Anything else is a new search and pushes,
+ * including the first and clearing it again, or three searches collapse into one entry.
  */
 function historyModeFor(
   patch: Partial<UsersQuery>,

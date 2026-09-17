@@ -45,12 +45,8 @@ export function parseUsersQuery(params: URLSearchParams): UsersQuery {
 }
 
 /**
- * Anything at its default is removed, so a first load is a bare path.
- *
- * `existing` is carried through rather than replaced. This function owns five parameters
- * and must not discard the rest: building a fresh URLSearchParams means that opening a
- * user and then sorting drops `?user=` and closes the dialog, and every parameter added
- * later walks into the same trap.
+ * Anything at its default is removed, so a first load is a bare path. `existing` is
+ * carried through: built fresh, sorting would drop `?user=` and close the dialog.
  */
 export function usersQueryToParams(
   query: UsersQuery,

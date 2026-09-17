@@ -36,66 +36,41 @@ type UsersTableProps = {
 const paperSx = { overflow: 'hidden' } as const;
 
 /**
- * Horizontal only. MUI's default is `overflow: auto`, which makes this a scroll container
- * on both axes: a second vertical scroller inside the page's own, for a box whose height
- * is always exactly its content. `hidden` on the vertical axis is what CSS requires here,
- * because an axis set to `visible` next to a scrolling one is computed back to `auto`.
+ * Horizontal only. `hidden` and not `visible` on the other axis, because CSS computes
+ * `visible` back to `auto` beside a scrolling one, adding a second vertical scroller.
  */
 const tableContainerSx = {
   overflowX: 'auto',
   overflowY: 'hidden',
-  /**
-   * Makes this the containing block for the visually hidden "Actions" label in the last
-   * header cell. That label is `position: absolute` with no positioned ancestor, so its
-   * containing block was the page itself and the scroller did not clip it: the document
-   * grew to reach its static position at 610px and the page got a horizontal scrollbar
-   * of its own on a phone, next to the table's. Everything else stayed inside the card,
-   * which is why only the scrollbar showed.
-   */
+  // The containing block for the visually hidden "Actions" label. Without it, that label
+  // is positioned against the page, which then grows to reach it and gains a scrollbar.
   position: 'relative',
 } as const;
 const pageSizes = [...PAGE_SIZE_OPTIONS];
 
-/**
- * The toolbar is laid out for a full-width table and does not fit a phone in one line, so
- * it wraps rather than being clipped by the card. The spacer defaults to a 100% basis,
- * which on its own would put every control on its own line.
- */
+/** Wraps rather than being clipped on a phone. The spacer's default 100% basis would
+ * otherwise put every control on its own line. */
 const paginationSx = {
-  // Same reason as the table container: MUI makes this a scroll container on both axes.
-  // It wraps now, so it never needs to scroll on either.
+  // It wraps, so it never needs to scroll on either axis.
   overflow: 'hidden',
   '& .MuiTablePagination-toolbar': {
     flexWrap: 'wrap',
     justifyContent: 'flex-end',
     rowGap: 1,
     py: 1,
-    // MUI pads this 16px on the left and 2px on the right, which left "1–10 of 10"
-    // against the card border with the page buttons below it. Even gutters instead, the
-    // same 16px the table's own cells use, so the two line up down the card.
+    // Even gutters, the same 16px the cells use, so the two line up down the card.
     px: 2,
   },
   '& .MuiTablePagination-spacer': { flex: '1 1 auto' },
-  /*
-   * MUI reserves 32px after the page size and 20px before the buttons. That is spacing
-   * for a table the width of a desktop window, and on a phone it was the difference
-   * between one line and two: at 399px the row needed all 365px it had, so the buttons
-   * wrapped and the card grew by 52px for a row holding two arrows. Half the spacing
-   * reads the same and gives back 28px.
-   */
+  // Half of MUI's spacing, which is sized for a desktop window. It reads the same and is
+  // the difference between one line and two on a phone.
   '& .MuiTablePagination-input': { mr: 2 },
   '& .MuiTablePagination-actions': { ml: 1 },
 } as const;
 
 /**
- * "Rows per page:" is 94px of the 341px a 375px phone gives this toolbar, which on its
- * own is enough to push the page buttons onto a second row. The words explain the number
- * beside them and the number is still there, so they are dropped where the line cannot
- * afford them. A media query rather than a breakpoint hook, so the label is right on the
- * first paint instead of after one.
- *
- * 420px is where the full label fits again, with room left over for a longer count than
- * this dataset's "1-10 of 10".
+ * "Rows per page:" costs 94px a phone does not have, and the number beside it says the
+ * same thing. A media query, not a breakpoint hook, so it is right on the first paint.
  */
 const perPageSx = {
   display: 'none',
@@ -152,18 +127,13 @@ export function UsersTable({
           aria-label="Users"
           size="small"
           sx={{
-            // Fixed, so the percentage widths on the headers are obeyed and the table is
-            // exactly as wide as its container. Left on auto it sizes to its longest cell,
-            // which put it at 752px whatever the window was doing and left the scrollbar
-            // showing at widths it had no reason to appear at.
+            // So the header percentages are obeyed. On auto the table sizes to its
+            // longest cell and scrolls at widths it has no reason to.
             tableLayout: 'fixed',
-            // Below this the columns are too narrow to read, so the container scrolls
-            // sideways instead of squeezing them further. This is the only scrollbar the
-            // page is meant to have besides its own.
+            // Below this the columns are unreadable, so the container scrolls instead.
             minWidth: 640,
-            // One line per cell, clipped if it does not fit. A wrapped cell would be
-            // taller than its skeleton and shift everything under the table when the data
-            // arrives. The detail view has the full value.
+            // One line per cell. A wrapped cell is taller than its skeleton and shifts
+            // the page when data arrives. The detail view has the full value.
             '& th, & td': {
               whiteSpace: 'nowrap',
               overflow: 'hidden',
@@ -181,8 +151,7 @@ export function UsersTable({
                 const isSortable = column.id === SORTABLE_COLUMN_ID;
 
                 return (
-                  // `sortDirection` is what puts aria-sort on the header, which is how a
-                  // screen reader is told the column is sorted and which way.
+                  // `sortDirection` is what puts aria-sort on the header.
                   <TableCell
                     key={column.id}
                     sortDirection={isSortable ? query.sort : false}
@@ -199,8 +168,7 @@ export function UsersTable({
                         {column.label}
                       </TableSortLabel>
                     ) : column.kind === 'actions' ? (
-                      // Every column needs a name for a screen reader, but a column of
-                      // buttons does not need a visible heading.
+                      // Named for a screen reader, without a visible heading.
                       <Box component="span" sx={visuallyHidden}>
                         {column.label}
                       </Box>

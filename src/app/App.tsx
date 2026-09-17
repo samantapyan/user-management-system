@@ -9,10 +9,8 @@ import { UsersScreen } from '@/features/users';
 export function App() {
   return (
     <Box sx={{ minHeight: '100dvh', bgcolor: 'background.default' }}>
-      {/* Transparent, not `default`. MUI's default AppBar colour is its own grey, which
-          was never coordinated with this theme's background, so it rendered as a faint
-          band a shade off the page. AppBar stays for the header element and the banner
-          landmark it gives a screen reader. */}
+      {/* Transparent, or MUI's own grey bands against the page. AppBar stays for the
+          banner landmark it gives a screen reader. */}
       <AppBar position="static" color="transparent" elevation={0}>
         <Toolbar>
           <Typography variant="h1" component="h1">

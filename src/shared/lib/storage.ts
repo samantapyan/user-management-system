@@ -1,17 +1,10 @@
 import type { ZodType } from 'zod';
 
 /**
- * Typed, versioned, validated access to one `localStorage` key.
- *
- * Everything here exists because `localStorage` is the least trustworthy input the app
- * has. It is a string map that survives deploys, so today's code reads what last month's
- * code wrote; the user can edit it by hand; and the browser can refuse both reads and
- * writes outright, which Safari does in private mode and which any browser does once the
- * quota is full. A bare `JSON.parse(localStorage.getItem(key)!)` fails at all three.
- *
- * So: the value is wrapped in a version, the parsed value is checked against a schema,
- * and anything that does not survive both is treated as absent rather than thrown. Old
- * or damaged data degrades to the fallback instead of taking the screen down with it.
+ * Typed, versioned, validated access to one `localStorage` key. It survives deploys, the
+ * user can edit it by hand, and the browser can refuse a read or a write outright, so a
+ * bare `JSON.parse(getItem(key))` fails three ways. Anything that does not survive the
+ * version and the schema is treated as absent rather than thrown.
  */
 
 type Envelope = {

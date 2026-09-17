@@ -1,13 +1,9 @@
 import type { User } from '../model/types';
 
 /**
- * The fields the detail view shows, defined once.
- *
- * The same lesson as the table columns: labels in one place and values in another is two
- * lists that drift. The name is not here because it is the dialog's title.
- *
- * `href` is the only rendering decision this config carries, because an email you cannot
- * click in a user management screen is an email you retype by hand.
+ * The detail fields, defined once, for the same reason as the table columns: labels in
+ * one place and values in another is two lists that drift. The name is the dialog title,
+ * so it is not here. `href` is the only rendering decision carried.
  */
 type UserDetailField = {
   id: string;

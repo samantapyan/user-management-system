@@ -1,9 +1,6 @@
 /**
- * Every URL parameter this feature owns, in one place.
- *
- * These stop being an implementation detail the moment somebody bookmarks or shares a
- * link, so they are a contract. Two modules read and write them, and a name defined in
- * both is a name that will eventually disagree with itself.
+ * Every URL parameter this feature owns. They become a contract the moment somebody
+ * shares a link, and two modules read them, so the names are spelled out once.
  */
 export const URL_PARAM = {
   search: 'q',

@@ -5,11 +5,9 @@ import { listUsers } from './usersApi';
 import { usersKeys } from './usersKeys';
 
 /**
- * The whole query object is the cache key, and that is what stops a slow answer for an
- * older view landing on a newer one: they are different cache entries, so it cannot be
- * written to the same place. Narrowing the key would reintroduce the race.
- *
- * The abort signal only stops unwanted work. The state would still be correct without it.
+ * The whole query object is the cache key, which is what stops a slow answer for an older
+ * view landing on a newer one. Narrowing it would bring the race back. The abort signal
+ * only saves work; the state would be correct without it.
  */
 export function useUsersQuery(query: UsersQuery) {
   // Read here rather than passed in, so no component has to remember to thread the

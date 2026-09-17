@@ -485,6 +485,7 @@ src/
       api/        everything that talks to the network
       constants/  values the feature is configured by, not logic
       model/      logic with no JSX. The part worth testing
+        hooks/    the React bindings over it, which a test cannot reach
       ui/         components
       index.ts    the only file the outside may import
   shared/

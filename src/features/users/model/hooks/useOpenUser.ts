@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useUrlParams } from '@/shared/lib/useUrlParams';
-import { parseOpenUserId, withOpenUser } from './openUserParam';
+import { parseOpenUserId, withOpenUser } from '../openUserParam';
 
 export function useOpenUser() {
   const [params, setParams] = useUrlParams();

@@ -12,11 +12,8 @@ const SEARCH_DEBOUNCE_MS = 300;
 
 const ALL_CITIES = '';
 
-/**
- * Only what this component displays, not the whole query. Taking `query` would mean a
- * new prop on every sort and every page change, neither of which it shows, and memoising
- * it would achieve nothing.
- */
+/** Only what this component displays. Taking the whole query would hand it a new prop on
+ * every sort and page change, and defeat the memo. */
 type UsersFiltersProps = {
   search: string;
   city: string | null;

@@ -41,11 +41,8 @@ export type UsersTableQueryPatch = Partial<
 export type UsersFiltersQueryPatch = Partial<Pick<UsersQuery, 'search' | 'city'>>;
 
 /**
- * One user's local changes: only the fields that were edited, never a whole user.
- *
- * A stored copy of the whole record would freeze every other field at the moment of the
- * edit, so a name change would also pin the email and the city to whatever the API said
- * that day. Storing the changed field alone keeps the rest fresh on every fetch.
+ * Only the fields that were edited, never a whole user. A stored copy of the record would
+ * pin the email and the city to whatever the API said on the day of the rename.
  */
 export type UserEdit = {
   name: string;
@@ -62,13 +59,8 @@ export type UsersPage = {
 };
 
 /**
- * What `api/` answers with.
- *
- * `editedIds` travels with the rows rather than being read from the store separately, and
- * that is the point: the rows are cached under the overlay that produced them, so a marker
- * read live from the store describes a different overlay than the names beside it for as
- * long as the next fetch takes. One source, no window. It goes the day a write endpoint
- * exists, together with the overlay it describes.
+ * What `api/` answers with. `editedIds` travels with the rows: read live from the store
+ * instead, a marker would describe a different overlay than the names beside it.
  */
 export type UsersResponse = UsersPage & {
   editedIds: number[];

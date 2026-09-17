@@ -2,11 +2,8 @@ import { compareUsersByName } from './sortUsers';
 import type { User, UsersPage, UsersQuery } from './types';
 
 /**
- * The work a server would do: search, filter, sort, then page.
- *
- * Local edits must already be merged into `users` before this is called. Merge them
- * after and a renamed row shows the new name while search and sort still use the old
- * one, which looks like three unrelated bugs.
+ * The work a server would do: search, filter, sort, then page. Local edits must already
+ * be merged into `users`, or search and sort run on a name nobody can see.
  */
 export function queryUsers(users: readonly User[], query: UsersQuery): UsersPage {
   const term = query.search.trim().toLocaleLowerCase();

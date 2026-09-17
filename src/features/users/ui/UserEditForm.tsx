@@ -28,15 +28,9 @@ const formSx = {
 const fieldSx = { flex: '1 1 200px' };
 
 /**
- * Renaming one user, in place of the dialog's heading.
- *
- * The rules are not in the brief, so they are in `userEditFormSchema` and nowhere else:
- * the same schema decides whether Save is enabled, what the message under the field says,
- * and what value is written. Validating in the component instead would be three places
- * that have to agree, and they eventually do not.
- *
- * `mode: 'onChange'` because Save is disabled while the value is invalid. A button that
- * is disabled until you submit once, with no visible reason, is a dead end.
+ * Renaming one user. `userEditFormSchema` is the only place the rules live, so enabling
+ * Save, the message under the field and the saved value cannot disagree. `onChange`
+ * because Save is disabled while the value is invalid, and a dead button needs a reason.
  */
 export function UserEditForm({
   user,

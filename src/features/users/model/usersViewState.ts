@@ -3,14 +3,9 @@ import type { User, UsersQuery, UsersResponse } from './types';
 import { isFiltered } from './usersParams';
 
 /**
- * What the screen is showing, as one value rather than four booleans.
- *
- * Derived from loose flags, "loading" and "empty" can both be true, and which one wins
- * depends on the order the component happens to check them. Here they cannot both exist,
- * so the interface renders a state instead of reconstructing one.
- *
- * It is also the reason this is testable: deciding what the screen shows needs no
- * rendering, no router and no network.
+ * What the screen is showing, as one value rather than four booleans. Derived from loose
+ * flags, loading and empty can both be true and the winner is whichever the component
+ * checks first. Here they cannot both exist, and deciding needs no rendering.
  */
 export type UsersViewState =
   | { status: 'loading' }

@@ -1,12 +1,8 @@
 import { URL_PARAM } from '../constants/urlParams';
 
 /**
- * Which user's detail is open, read from and written to the URL. Pure, so it is testable
- * without rendering anything.
- *
- * Deliberately not part of `UsersQuery`. Opening a user does not change which users are
- * listed, and `UsersQuery` is the data layer's cache key, so folding this into it would
- * refetch the whole list every time somebody opened a row.
+ * Which user's detail is open, held in the URL. Deliberately not part of `UsersQuery`:
+ * that is the cache key, so folding it in would refetch the list on every row opened.
  */
 
 /** A URL is user input, so anything that is not a positive integer opens nothing. */

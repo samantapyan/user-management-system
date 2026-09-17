@@ -46,11 +46,8 @@ function toUser(raw: z.infer<typeof apiUserSchema>): User {
 }
 
 /**
- * What may be read back out of `localStorage`.
- *
- * Deliberately loose about the name: a value that fails today's form rules can still have
- * been written by an older build, and refusing to read it would lose every other edit
- * stored alongside it. The form validates what goes in; this only guarantees the shape.
+ * What may come back out of `localStorage`. Loose about the name on purpose: an older
+ * build may have written it, and refusing it would lose every edit stored alongside.
  */
 export const userEditsSchema: z.ZodType<UserEdits> = z.record(
   z.string(),
@@ -58,12 +55,8 @@ export const userEditsSchema: z.ZodType<UserEdits> = z.record(
 );
 
 /**
- * The rename form. Nothing in the brief says what a name may be, so: trimmed, required,
- * two to sixty characters, duplicates allowed.
- *
- * Trimmed by the schema rather than by the submit handler, so the value that is validated
- * is the value that is saved. Validating the untrimmed string would accept a name of
- * three spaces.
+ * The rename form. Nothing in the brief says what a name may be, so: two to sixty
+ * characters, duplicates allowed. Trimmed here, or a name of three spaces passes.
  */
 export const userEditFormSchema = z.object({
   name: z

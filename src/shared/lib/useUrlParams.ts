@@ -4,12 +4,9 @@ import { useSearchParams } from 'react-router';
 type SetParams = ReturnType<typeof useSearchParams>[1];
 
 /**
- * `useSearchParams`, with a writer that keeps its identity.
- *
- * React Router returns a new `setSearchParams` on every location change. Consumers hold
- * the writer in dependency arrays and pass it down as a prop, so a fresh function each
- * time re-runs their effects and defeats every memo below them. Read through a ref, it is
- * stable for the life of the component.
+ * `useSearchParams`, with a writer that keeps its identity. React Router returns a new
+ * `setSearchParams` on every location change, which re-runs the effects of everything
+ * holding it and defeats the memos below. Through a ref it is stable.
  */
 export function useUrlParams(): [URLSearchParams, SetParams] {
   const [params, setParams] = useSearchParams();

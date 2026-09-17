@@ -1,16 +1,10 @@
 import type { User } from '../model/types';
 
 /**
- * The table's columns, defined once.
- *
- * The header, the body and the loading skeleton all read this array. Before it existed
- * the labels lived in the header, the values lived in the row component and the count
- * lived in an `Array.from({ length: 4 })`, so adding a column meant three edits in two
- * files and nothing checked that they agreed. A mismatch is only visible while data is
- * loading, which is exactly when nobody is looking.
- *
- * Two kinds, because the actions column is not data and has no value to read from a
- * user. Keeping it in the same array is what stops the count drifting again.
+ * The table's columns, defined once: the header, the body and the skeleton all read this
+ * array, so adding a column is one entry rather than three edits that have to agree. Two
+ * kinds, because the actions column has no value to read, and leaving it out of the array
+ * is how the skeleton's count drifts from the table's.
  */
 
 type UserColumnId = 'name' | 'email' | 'city' | 'company';
@@ -78,11 +72,8 @@ export const USERS_COLUMNS: readonly (DataColumn | ActionsColumn)[] = [
 ];
 
 /**
- * The one column the table can sort by, named here rather than flagged per column.
- *
- * `UsersQuery` carries a direction and no field, so exactly one column can be sortable.
- * A `sortable` flag on every column would say otherwise, and setting it on a second one
- * would render two headers both marked as the active sort, both toggling this one.
- * Adding a second sortable column means adding `sortBy` to `UsersQuery` first.
+ * The one sortable column. `UsersQuery` carries a direction and no field, so a `sortable`
+ * flag per column would let two headers both claim to be the active sort. A second one
+ * means adding `sortBy` to `UsersQuery` first.
  */
 export const SORTABLE_COLUMN_ID: UserColumnId = 'name';

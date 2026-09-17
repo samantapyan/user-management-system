@@ -25,10 +25,8 @@ import { UserEditForm } from './UserEditForm';
 
 const TITLE_ID = 'user-detail-title';
 /*
- * MUI stamps the dialog's `aria-labelledby` value onto `DialogTitle` unless it is given
- * an id of its own, which put the same id on the block and on the heading inside it. Two
- * elements answered to it, the outer one won, and the dialog's accessible name became the
- * heading plus every word of the form.
+ * MUI stamps `aria-labelledby` onto `DialogTitle` unless it has an id of its own, so two
+ * elements answer to it and the dialog's name becomes the heading plus the whole form.
  */
 const TITLE_BLOCK_ID = 'user-detail-title-block';
 const DISCARD_TITLE_ID = 'discard-edit-title';
@@ -41,12 +39,8 @@ type UserDetailDialogProps = {
 };
 
 /*
- * One line, and the name is what gives way. A renamed user can be sixty characters long,
- * and with wrapping the pencil left the heading and went to a line of its own, which put
- * the control for a thing below the thing it controls.
- *
- * While editing the heading is `position: absolute`, so it stops being a flex item and
- * the form is the only one left, which is why the same row works for both states.
+ * One line, and the name is what gives way: wrapped, the pencil drops below the thing it
+ * edits. While editing the heading is absolute, so the same row serves both states.
  */
 const titleSx = { display: 'flex', alignItems: 'center', flexWrap: 'nowrap', gap: 1 };
 
@@ -66,11 +60,8 @@ const termSx = { gridColumn: { sm: 1 }, color: 'text.secondary', py: 0.75, pr: 3
 const definitionSx = { gridColumn: { sm: 2 }, m: 0, py: { xs: 0, sm: 0.75 }, pb: 0.75 };
 
 /**
- * Rendered only while a user is open, rather than kept mounted with `open={false}`.
- *
- * That trades MUI's closing animation for content that is never half gone: keeping it
- * mounted means the id becomes null while the dialog is still fading, and it fades out
- * empty. Reduced motion is respected elsewhere anyway, so an instant close is consistent.
+ * Mounted only while a user is open. Kept mounted, the id goes null mid fade and the
+ * dialog empties as it closes, which is worse than losing the animation.
  */
 export function UserDetailDialog({ userId, fromRow, onClose }: UserDetailDialogProps) {
   const query = useUserQuery(userId, fromRow);
@@ -80,23 +71,14 @@ export function UserDetailDialog({ userId, fromRow, onClose }: UserDetailDialogP
   const [isEditing, setIsEditing] = useState(false);
   const [storageRefused, setStorageRefused] = useState(false);
 
-  /*
-   * A ref rather than state, for two reasons. Nothing renders from it, and more
-   * importantly the blocker below is asked for the answer during an event, before React
-   * has re-rendered: discarding sets this false and navigates in the same handler, and
-   * with state the blocker would still see the old value and block our own close.
-   */
+  // A ref, not state: the blocker is asked during an event, before React re-renders, so
+  // state would still read the old value and block our own close.
   const hasUnsavedInput = useRef(false);
 
   /*
-   * One guard for every way out, because this dialog is opened and closed by a URL
-   * parameter. Escape, the backdrop, the Close button and the browser's back button all
-   * end as the same navigation, so guarding the component's own close handler would have
-   * covered three of the four and let the back button throw the edit away in silence.
-   *
-   * What it does not cover is a reload or closing the tab. That needs `beforeunload`,
-   * whose prompt the browser writes and the page cannot word, so it is left out and said
-   * out loud in the README instead.
+   * One guard for every way out. Escape, the backdrop, Close and the back button are all
+   * the same navigation here, so guarding the close handler would miss the back button.
+   * A reload is not covered: that needs `beforeunload`, whose wording is the browser's.
    */
   const blocker = useBlocker(useCallback(() => hasUnsavedInput.current, []));
   const isBlocked = blocker.state === 'blocked';
@@ -116,11 +98,8 @@ export function UserDetailDialog({ userId, fromRow, onClose }: UserDetailDialogP
     }
   }
 
-  /*
-   * Deliberately does not keep the draft to put back next time. Text the user walked away
-   * from reappearing later, indistinguishable from a value that was actually saved, is a
-   * bug wearing a feature's clothes.
-   */
+  // The draft is not kept. Text the user walked away from, reappearing later and looking
+  // like a saved value, is a bug wearing a feature's clothes.
   function discard(): void {
     leaveEditMode();
     if (blocker.state === 'blocked') {
@@ -133,19 +112,14 @@ export function UserDetailDialog({ userId, fromRow, onClose }: UserDetailDialogP
       {/* A div, because while editing this holds a form, and a form inside an `h2` is
           not valid HTML. The heading is still in there, as its own element. */}
       <DialogTitle component="div" id={TITLE_BLOCK_ID} sx={titleSx}>
-        {/*
-         * Never removed, only hidden, because it is what names the dialog. Take it out
-         * of the tree while editing and `aria-labelledby` points at nothing, so a screen
-         * reader announces an unnamed dialog at exactly the moment the user is changing
-         * the name of something.
-         */}
+        {/* Hidden, never removed: it names the dialog, and taking it out points
+            `aria-labelledby` at nothing exactly while the user is renaming. */}
         <Typography
           component="h2"
           variant="inherit"
           id={TITLE_ID}
           sx={isEditing ? visuallyHidden : headingSx}
-          // The full name for a mouse, since the visible text may be cut short. A screen
-          // reader already gets it in full from the element itself.
+          // The full name for a mouse; a screen reader already has it.
           {...(user === null ? {} : { title: user.name })}
         >
           {title(query.isPending, query.isError, user)}
@@ -193,9 +167,8 @@ export function UserDetailDialog({ userId, fromRow, onClose }: UserDetailDialogP
               </Tooltip>
             )}
             {isEdited && (
-              // Says the name on screen is not the name the API returned. Without it a
-              // renamed user is indistinguishable from one the server actually knows by
-              // that name, which is the whole reason this is only a local edit.
+              // Says the name on screen is not the one the API returned, which is the
+              // whole point of the edit being local.
               <Chip label="Edited here" size="small" variant="outlined" />
             )}
           </Box>
@@ -219,8 +192,8 @@ export function UserDetailDialog({ userId, fromRow, onClose }: UserDetailDialogP
         )}
 
         {user !== null && (
-          // A definition list, because these are label and value pairs. A screen reader
-          // then reads "Email, Sincere at april dot biz" rather than two loose strings.
+          // A definition list, so a screen reader reads "Email, Sincere at april dot biz"
+          // rather than two loose strings.
           <Box component="dl" sx={listSx}>
             {USER_DETAIL_FIELDS.map((field) => {
               const value = field.value(user);

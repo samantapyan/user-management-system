@@ -7,9 +7,8 @@ import { usersResponseSchema } from '../model/schemas';
 import type { User, UserEdits, UsersQuery, UsersResponse } from '../model/types';
 
 /**
- * Query in, page and total out. There is no server that can do any of it yet, so the
- * whole list is fetched and the query applied here. Keeping that inside this module is
- * what makes a real backend a change to this file rather than to the screen.
+ * Query in, page and total out. No server does any of it yet, so the whole list is
+ * fetched and queried here, which makes a real backend a change to this file alone.
  */
 
 const USERS_ENDPOINT = `${config.apiBaseUrl}/users`;
@@ -31,9 +30,8 @@ async function fetchAllUsers(signal?: AbortSignal): Promise<User[]> {
 }
 
 /**
- * The local renames are an input, not a decoration applied afterwards, and they are
- * merged in on the line before the query runs. That single ordering is what makes search
- * and sort agree with what is on screen. See `applyEdits`.
+ * The renames are an input, not a decoration: merged in on the line before the query
+ * runs, which is what makes search and sort agree with the screen. See `applyEdits`.
  */
 export async function listUsers(
   query: UsersQuery,
@@ -54,25 +52,16 @@ export async function listUsers(
 }
 
 /**
- * Its own call on purpose, even though today it fetches the same thing as the list.
- *
- * The filter needs every city, and the list only ever returns one page, so the dropdown
- * cannot be built from it. A real backend would answer this from its own endpoint, and
- * writing it as a separate call now means that day changes this function and nothing
- * else. Against the fixture it costs a second request that the browser cache usually
- * serves.
+ * Its own call on purpose. The filter needs every city and the list returns one page, so
+ * a real backend changes this function and nothing else. It costs one cached request.
  */
 export async function listCities(signal?: AbortSignal): Promise<string[]> {
   return distinctCities(await fetchAllUsers(signal));
 }
 
 /**
- * One user. Today it filters the same full fetch; a real backend answers this from
- * `/users/:id`, and only this function changes.
- *
- * Returns null rather than throwing when there is no such user. A link to a user who has
- * been deleted is an ordinary thing to happen, not a failure of the request, and the two
- * deserve different messages on screen.
+ * One user. Null rather than a throw when there is none: a link to a deleted user is an
+ * ordinary thing to happen, not a failed request, and they deserve different messages.
  */
 export async function getUser(id: number, signal?: AbortSignal): Promise<User | null> {
   const users = await fetchAllUsers(signal);

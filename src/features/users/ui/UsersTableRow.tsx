@@ -18,10 +18,8 @@ type UsersTableRowProps = {
 const rowHeaderSx = { fontWeight: 'medium' } as const;
 
 /*
- * A dot rather than a chip or the word "edited". Every cell on this row is one line with
- * the overflow clipped, so anything wider is taken out of the name it is describing. The
- * tooltip carries the meaning for a mouse, and the hidden text carries it for a screen
- * reader, which is the pair a bare dot needs to not be decoration.
+ * A dot, not a chip: every cell is one clipped line, so anything wider is taken out of
+ * the name beside it. The tooltip and the hidden text are what stop it being decoration.
  */
 const markerSx = {
   display: 'inline-block',

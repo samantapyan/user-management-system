@@ -5,12 +5,9 @@ import { userEditsSchema } from './schemas';
 import type { UserEdits } from './types';
 
 /**
- * Every local rename, and the only thing in the app that outlives a reload.
- *
- * A store rather than React state because the overlay is read in two unrelated places -
- * the list query and the detail query - and neither is an ancestor of the other. Context
- * would work and would re-render every consumer of it on every keystroke elsewhere;
- * `useSyncExternalStore` lets React subscribe to exactly this and nothing more.
+ * Every local rename, and the only thing that outlives a reload. A store rather than
+ * context, because the two readers are not ancestors of each other and context would
+ * re-render every consumer on a keystroke elsewhere.
  */
 
 const EMPTY: UserEdits = {};
@@ -23,16 +20,9 @@ const storage = createStorage<UserEdits>({
 });
 
 /**
- * Read once, on the first question, then kept in memory.
- *
- * Kept, because `getSnapshot` has to return the same reference until the value actually
- * changes: reading from `localStorage` on every call hands back a new object each time,
- * which makes `useSyncExternalStore` see a change on every render and loop until React
- * gives up.
- *
- * Lazy, because reading at module scope would touch `localStorage` on import. Every other
- * file in `model/` can be imported and tested with no browser at all, and one that cannot
- * be is the one nobody writes a test for.
+ * Kept, because `getSnapshot` must return the same reference until the value changes, or
+ * `useSyncExternalStore` sees a new object every render and loops. Lazy, because reading
+ * at module scope would touch `localStorage` on import and make this untestable.
  */
 let snapshot: UserEdits | null = null;
 
@@ -67,12 +57,8 @@ function getSnapshot(): UserEdits {
 }
 
 /**
- * Applies the change in memory first and reports whether it also reached disk.
- *
- * The two are separate on purpose. A full quota or a browser with storage switched off
- * must not swallow the rename the user just made, but it must not be reported as saved
- * either: that is the difference between a change that survives a reload and one that
- * does not, and the user is the only one who can decide what to do about it.
+ * In memory first, then reports whether it reached disk. A full quota must not swallow
+ * the rename, and must not be reported as saved either. Only the user can act on that.
  */
 function commit(next: UserEdits): boolean {
   snapshot = next;
