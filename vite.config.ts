@@ -1,3 +1,4 @@
+/// <reference types="vitest/config" />
 import { defineConfig } from 'vite';
 import react from '@vitejs/plugin-react';
 
@@ -34,5 +35,17 @@ export default defineConfig({
     rollupOptions: {
       output: { manualChunks: vendorChunk },
     },
+  },
+
+  /* Here rather than in a vitest.config.ts of its own, so the alias above is the only one
+     the tests resolve through. A second config file means a second copy of it, and two
+     copies of a path mapping are two things that will eventually disagree.
+
+     No browser environment: the only DOM API the app touches is localStorage, and the
+     tests that need it install their own. Adding jsdom for the sake of it would cost a
+     dependency, a slower run, and a fake that is harder to make misbehave on purpose. */
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
   },
 });

@@ -34,9 +34,11 @@ npm run dev          # http://localhost:5173
 Other scripts:
 
 ```bash
+npm test             # the unit tests, once
+npm run test:watch   # the same, staying open
 npm run build        # tsc -b && vite build, output in dist/
 npm run preview      # serve the production build on http://localhost:4173
-npm run verify       # typecheck, then lint, then format check
+npm run verify       # typecheck, lint, format check, then the tests
 ```
 
 The API it points at is configuration, not a literal in the source. Copy `.env.example` to
@@ -189,9 +191,10 @@ from the components those needed: a dialog, a tooltip, a chip, a text field. Tha
 price of the MUI decision above, stated rather than hidden.
 
 **Added when it was needed, not on day one.** React Hook Form arrived in the commit that
-uses it, so the history shows what it was for rather than a dependency list appearing on the
-first day for reasons nobody can reconstruct afterwards. Vitest and React Testing Library
-were planned the same way and never arrived; the tests section says what happened instead.
+uses it, and Vitest in the commit that added the tests, so the history shows what each one
+was for rather than a dependency list appearing on the first day for reasons nobody can
+reconstruct afterwards. React Testing Library was planned the same way and never arrived,
+because nothing here renders a component to test it. The tests section says why.
 
 ## Gaps and contradictions in the requirements
 
@@ -488,7 +491,15 @@ src/
     config.ts     anything that changes between environments
     ui/           components more than one feature would need
     lib/          helpers more than one feature would need
+  test/           fixtures and fakes the tests share, no tests of its own
 ```
+
+Tests sit next to what they cover, as `*.test.ts` beside the module, rather than in a
+`__tests__` folder mirroring the tree. Two places to look for one thing is one too many,
+and a test that has drifted from its module is harder to notice from another folder. The
+one place the feature boundary is crossed is `src/test/makeUser.ts`, which imports the
+`User` type from inside the feature: `import type`, so it erases and adds nothing to the
+module graph, which beat widening the feature's public surface for a fixture.
 
 Grouped by feature rather than by file type. A top level `components/`, `hooks/`, `utils/`
 works for five files and stops working at around thirty screens, because from then on one
@@ -498,8 +509,9 @@ Four rules hold it together. Imports flow one way, so a feature may use `shared`
 the reverse, and two features never import each other. A feature is entered through its
 `index.ts`, so everything inside it can be renamed or moved without touching a file outside.
 The network is touched only in `api/`, so no component ever knows a URL. And `model/` holds
-the logic with no JSX, which is exactly the part that is worth testing, because testing it
-does not need a rendered component.
+the logic with no JSX, which is the part worth testing, because testing it needs no
+rendered component: thirteen of the twenty tests point at it, four at `api/` and three at
+`shared/lib/`, and not one of them needs a browser.
 
 That shape costs requests against this fixture, and the number is worth stating rather than
 hiding. `listUsers` and `listCities` both want the whole dataset and stay separate calls,
@@ -600,36 +612,64 @@ live region, and the empty state's cell spans the real number of columns.
 
 ## Tests
 
-**There is no test runner in this repository, and no test files. That is the weakest part of
-what I am handing over, so it gets said plainly rather than buried.**
+Twenty tests in nine files, next to the modules they cover. `npm test` runs them, and
+`npm run verify` runs them after the typecheck, the lint and the format check. They finish
+in about a second.
 
-What exists instead is six executable check suites, 123 assertions, run against the real
-modules after every change while building. They cover the parts that are genuinely hard:
+Twenty rather than two hundred is the part worth explaining. Every test in here names a
+bug it would catch, in a comment above the assertion, and one that could not name a bug
+was not written. A coverage percentage measures how much of the code a suite happened to
+execute, which is not the same as how much of it is protected, and it is easy to get a
+high one out of tests that would pass whatever the code did.
 
-- the query pipeline: search, city filter, sort, the collator against a plain comparison,
-  paging, page clamping, stable order for duplicate names, the live endpoint, cancellation
-- the URL contract in both directions, including a hand edited URL that must not break the
-  screen
-- the view state machine: one state at a time, and a failed refresh that keeps real rows
-  while discarding borrowed ones
-- the detail dialog's parameter, and the trap that a filter change must not close it
-- the edit overlay, including the trap this whole feature turns on: that search, sort and
-  paging see the renamed value, and that applying the overlay afterwards would get it wrong
-- the storage layer: a version it cannot read, a value the schema rejects, unparseable
-  JSON, a browser that refuses to read, a browser that refuses to write, and other tabs
+**What they protect.**
 
-The assertions are written as sentences, so reading the output reads as a list of decisions
-rather than a list of components.
+- **The edit overlay, which is what this feature turns on.** Renames are merged in before
+  the search, the sort and the paging run. Two tests, because merging them in afterwards
+  produces two unrelated looking symptoms: a search that cannot find a name printed on the
+  row in front of you, and a row sitting on the wrong page.
+- **The markers on renamed rows**, which have to describe the rows that were returned
+  rather than whatever the edit store says by the time the render runs.
+- **Paging that does not lose a row.** Sorting is stable, so without the tie break on id
+  the order the API happened to return is the order on screen. The test walks every page
+  twice, with the fixture in two different orders, because a single order cannot catch it.
+- **The URL in both directions**, as a round trip over nine views, plus eleven URLs nobody
+  should have typed. `?size=100000` is the one that matters: admitted, it is a request for
+  ten thousand rows.
+- **The view state machine**, where the same error and the same rows have three different
+  right answers depending on whether those rows answer the query that just failed.
+- **The storage layer**: six ways a browser lets you down, each read as the fallback rather
+  than thrown during a render, and a refused write that is reported instead of swallowed.
+- **A cancelled request against one that timed out.** Both arrive as the same kind of
+  `DOMException`, and confusing them puts an error on screen for every superseded keystroke.
+- **The two edges data crosses**: what the API may send and still be understood, and what
+  may come back out of `localStorage`, which anybody can edit by hand.
 
-What is wrong with this is not the coverage, it is the packaging. They were written as a
-harness for myself rather than as a suite for you: they live outside `src/`, they are not
-wired to `npm test`, and so you cannot run them. The checking happened and the handover did
-not, and those are not the same thing.
+**They were checked by breaking the code.** A passing test proves nothing about whether it
+would ever fail, so I broke the source nineteen different ways, one at a time, and ran the
+suite against each: the overlay merged in after the query, the tie break removed, the page
+clamp removed, the collator swapped for `<`, a cancelled request reported as a network
+failure, storage ignoring the version it wrote, a refused write reported as a success, the
+rename form validating before trimming, and so on. Every one was caught, and every one of
+the twenty tests fails under at least one of them. Nothing in here is decoration, and that
+is a measurement rather than a claim.
 
-Given more time the fix is small and specific: the same assertions under Vitest, unchanged
-in substance, plus two that need a rendered component and a fake timer, which is the only
-reason React Testing Library would come with it. What I would still not write is a test that
-mounts a component and asserts that it mounted. A deliberate skip is worth more than that.
+**One dev dependency, and no browser.** Vitest, and nothing else. The only browser API this
+app touches is `localStorage`, so the two files that need it install a fake that can be
+told to refuse a read, refuse a write, or deny access to the store outright. No real
+browser will do that on demand, which makes the fake the subject of the test rather than a
+stand-in for something better. It is Vitest 3 rather than 4 because 4 needs Node 20.19 and
+this is built on 20.9.
+
+**What is deliberately not tested.** Nothing that renders. The behaviour worth covering
+there is the guard on an unsaved rename, and reaching it means React Testing Library, a
+DOM environment and a router in the test. That is a real gap and it is the first thing I
+would add. The `useSyncExternalStore` wiring in the edit store is the same story: it needs
+a renderer, and faking one would only test the fake. `historyModeFor`, the rule deciding
+which search gets its own history entry, is private inside `useUsersParams`, and testing
+it means moving it into its own module the way `usersParams` and `openUserParam` already
+are. I would rather name it here than change source to make a test possible. What I would
+still not write is a test that mounts a component and asserts that it mounted.
 
 ## What is still wrong with this
 
@@ -653,9 +693,9 @@ is right while the table is wider than its container and a stop that does nothin
 is not. Telling the two apart needs a `ResizeObserver`, which is more machinery than the
 problem is worth.
 
-**And one that is not in the code: the checks are not in the repository.** 123 assertions
-ran against the real modules after every change and you can run none of them. The Tests
-section says what they cover.
+**And one that is not in the code: nothing that renders is tested.** The guard on an
+unsaved rename is the behaviour I would most want covered, and it is the one thing here
+that cannot be reached without a renderer. The Tests section says what that would cost.
 
 ## What I would need before building this for real
 

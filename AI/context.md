@@ -33,7 +33,8 @@ npm run dev        # http://localhost:5173
 To check your work:
 
 ```bash
-npm run verify     # typecheck, then lint, then format check
+npm run verify     # typecheck, lint, format check, then the tests
+npm test           # the tests on their own
 npm run build      # tsc -b && vite build
 ```
 
@@ -61,24 +62,38 @@ A green Lighthouse is a floor, not a pass. It reported accessibility 100 while t
 header had no visible focus ring at all, because it cannot tell whether a focus style is
 actually visible. Tab through the screen yourself and look at where focus lands.
 
-**There is no test runner in this repository.** No Vitest, no test files, nothing behind
-`npm test`. That is a known gap, written up in the README, and not an invitation to skip
-checking. Behaviour is verified by calling the real modules and asserting on what they
-return, and by driving the built app in a browser. If you touch `model/` or `api/`, write
-assertions against the real functions and run them before you claim it works. `model/` is
-free of React and of the DOM precisely so that this costs you nothing.
+**There is a test suite: `npm test`, or `npm run test:watch`.** Twenty tests, nine files,
+Vitest, and `npm run verify` runs them last.
 
-If you build such a script outside `src/`, nothing typechecks it. Rebuild it from source
-every time you run it. A stale build of one reported green for a whole session here while
-it was calling a function whose signature had changed underneath it.
+Tests sit beside the module they cover, as `queryUsers.test.ts` next to `queryUsers.ts`,
+not in a `__tests__` folder. Shared fixtures and fakes are in `src/test/`: `makeUser` builds
+a user with every field filled in, and `installFakeLocalStorage` hands you a `localStorage`
+you can tell to refuse a read, refuse a write, or deny access to the store outright.
 
-A script that only touches `model/` runs under `npx tsx` as it is. One that reaches `api/`
-does not, because that pulls in `shared/config.ts`, which reads `import.meta.env`, and
-`tsx` does not define it. Bundle those first, which also gives you the alias:
+**There is no DOM.** The environment is `node`, with no jsdom and no React Testing Library.
+The only browser API this app touches is `localStorage`, and the fake covers it. Needing a
+DOM means you are testing a component, which is the paragraph after next.
 
-```bash
-npx esbuild script.ts --bundle --format=esm --platform=node --target=node20   --define:import.meta.env="{}" --alias:@=./src --outfile=script.mjs && node script.mjs
-```
+**If you change `model/` or `api/`, the test comes with the change, in the same commit.**
+Both layers are free of React and of the DOM precisely so that this costs you nothing.
+
+**The bar for a new test is that it names a bug it would catch**, in a comment above the
+assertion, and the name of the test says the behaviour rather than the function. If you
+cannot name the bug, do not write the test. Then prove it: break the code it covers on
+purpose, watch it fail, and put the code back. A test that passes either way is worse than
+no test, because it reports green while checking nothing. Every test here was checked that
+way, against nineteen deliberate breakages.
+
+Do not write a test that mounts a component and asserts it mounted, a snapshot, a test that
+mocks everything and then asserts the mocks were called, or a test added to move a coverage
+number. Twenty tests that each name a bug beat two hundred that execute lines.
+
+**Nothing that renders is tested, and adding the first one is a decision, not a chore.** It
+means React Testing Library, a DOM environment and a router in the test. If the work you
+are doing genuinely needs it, say so in the commit rather than quietly adding three
+dependencies. The known gap is the guard on an unsaved rename.
+
+Vitest is pinned to 3.x. Version 4 needs Node 20.19 and this is built on 20.9.
 
 For accessibility, a score is not a check. Load axe-core against the running preview and
 run it in every state your change can reach, not only the first paint:
@@ -100,9 +115,10 @@ form in its invalid state. Read its `incomplete` results as well and settle them
 both of the ones reported here are false positives, and proving that took measuring the
 contrast manually and tabbing to confirm the dialog traps focus.
 
-**Finished means all of these, not the first one.** `npm run verify` exits 0. `npm run
-build` exits 0. The behaviour you changed is exercised in a browser. Nothing that used to
-work has stopped.
+**Finished means all of these, not the first one.** `npm run verify` exits 0, which
+includes the tests. `npm run build` exits 0. Logic you changed in `model/` or `api/` has a
+test that fails without your change. The behaviour you changed is exercised in a browser.
+Nothing that used to work has stopped.
 
 **Measure, do not estimate.** Every number in the README was measured: bundle size before
 and after a dependency, requests per action, layout shift compared against the build from
@@ -125,14 +141,18 @@ src/
     users/              the whole product, one folder
       api/              everything that talks to the network
       constants/        values the feature is configured by, not logic
-      model/            logic with no JSX. This is the part worth testing
+      model/            logic with no JSX. Most of the tests point here
       ui/               components
       index.ts          the only file the outside may import
   shared/
     config.ts           anything that changes between environments
     ui/                 components more than one feature would need
     lib/                helpers more than one feature would need
+  test/                 fixtures and fakes the tests share, no tests of its own
 ```
+
+Every `*.test.ts` sits beside the module it covers, so the tree above is also the map of
+where a test goes.
 
 The files you are most likely to need, and what each one owns:
 
@@ -173,6 +193,12 @@ between this app and a graph where everything depends on everything.
 reach inside it. Import from `features/users`, never from
 `features/users/ui/UsersTable`. Everything inside the feature can then be renamed, split or
 moved without touching a file outside it.
+
+The one exception is `src/test/makeUser.ts`, which imports the `User` type from
+`features/users/model/types`. It is `import type`, so it erases at compile time and adds no
+edge to the module graph, and the alternative was widening the feature's public surface for
+a fixture. If you need a value rather than a type from inside a feature, that exception does
+not stretch to cover you.
 
 **3. The network is touched in `features/*/api` and nowhere else.** No `fetch` in a
 component, in a hook outside `api/`, or in `model/`. The abort signal and the error
