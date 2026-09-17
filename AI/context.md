@@ -131,7 +131,10 @@ tested by exporting it, test it through whatever does use it instead, or give it
 module with a real surface. `index.ts` is the same rule one level up.
 
 **7. The table's columns are defined once, in `constants/usersColumns.ts`.** Adding a
-column is one entry in that array and nothing else. If you find yourself editing the header, the row
+column is one entry in that array and nothing else. Sorting is the exception: `UsersQuery`
+carries a direction and no field, so exactly one column can be sortable and it is named by
+`SORTABLE_COLUMN_ID`. Making a second column sortable means adding `sortBy` to
+`UsersQuery` first. If you find yourself editing the header, the row
 component and a skeleton to add one column, stop: that is the bug this file was created to
 remove, and a mismatch between them is only visible while data is loading, which is when
 nobody is looking. The same applies to anything else that would otherwise be declared in
@@ -175,6 +178,11 @@ design system on top of MUI, stop.
 - **Adding a backend, authentication, or real persistence.** All explicitly out of scope.
 - **Writing a URL or any other per-environment value as a literal.** It goes in
   `shared/config.ts`, read from `import.meta.env`, with the current value as the fallback.
+- **Making a deliberate user action replace the history entry instead of pushing one.**
+  Only continuous typing replaces, because it produces states the user never chose. A
+  filter, a sort, a page and a page size are each one decision, and back is how people
+  undo a decision. This was got wrong once already: everything but paging replaced, so
+  changing the city four times left one entry and back had nowhere to go.
 - **Deleting the loading, empty, no-results or error states** because the fixture always
   succeeds. They exist for the API this will meet, not the one it has, and two of them are
   reachable today with a query string.

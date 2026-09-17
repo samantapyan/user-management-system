@@ -1,12 +1,7 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
 import type { UsersQuery } from '../model/types';
 import { listUsers } from './usersApi';
-
-const usersKeys = {
-  all: ['users'] as const,
-  // Built from `all`, so invalidating every users query keeps working if it changes.
-  list: (query: UsersQuery) => [...usersKeys.all, 'list', query] as const,
-};
+import { usersKeys } from './usersKeys';
 
 /**
  * The whole query object is the cache key, and that is what stops a slow answer for an

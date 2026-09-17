@@ -11,7 +11,7 @@ import TableRow from '@mui/material/TableRow';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import { LiveRegion } from '@/shared/ui/LiveRegion';
 import { PAGE_SIZE_OPTIONS } from '../constants/pagination';
-import { USERS_COLUMNS } from '../constants/usersColumns';
+import { SORTABLE_COLUMN_ID, USERS_COLUMNS } from '../constants/usersColumns';
 import type { User, UsersQuery, UsersTableQueryPatch } from '../model/types';
 import { toPageSize } from '../model/usersParams';
 import { UsersTableRow } from './UsersTableRow';
@@ -52,7 +52,9 @@ export function UsersTable({
         message={
           isLoading
             ? 'Loading users'
-            : `${total} ${total === 1 ? 'user' : 'users'}, sorted by name, ${
+            : // Grouped, because "100000 users" is read out as a digit stream while
+              // the pagination beside it already says "of 100,000".
+              `${total.toLocaleString()} ${total === 1 ? 'user' : 'users'}, sorted by name, ${
                 query.sort === 'asc' ? 'ascending' : 'descending'
               }`
         }
@@ -82,29 +84,33 @@ export function UsersTable({
         >
           <TableHead>
             <TableRow>
-              {USERS_COLUMNS.map((column) => (
-                // `sortDirection` is what puts aria-sort on the header, which is how a
-                // screen reader is told the column is sorted and which way.
-                <TableCell
-                  key={column.id}
-                  sortDirection={column.sortable === true ? query.sort : false}
-                  sx={{ width: column.width }}
-                >
-                  {column.sortable === true ? (
-                    <TableSortLabel
-                      active
-                      direction={query.sort}
-                      onClick={() =>
-                        onQueryChange({ sort: query.sort === 'asc' ? 'desc' : 'asc' })
-                      }
-                    >
-                      {column.label}
-                    </TableSortLabel>
-                  ) : (
-                    column.label
-                  )}
-                </TableCell>
-              ))}
+              {USERS_COLUMNS.map((column) => {
+                const isSortable = column.id === SORTABLE_COLUMN_ID;
+
+                return (
+                  // `sortDirection` is what puts aria-sort on the header, which is how a
+                  // screen reader is told the column is sorted and which way.
+                  <TableCell
+                    key={column.id}
+                    sortDirection={isSortable ? query.sort : false}
+                    sx={{ width: column.width }}
+                  >
+                    {isSortable ? (
+                      <TableSortLabel
+                        active
+                        direction={query.sort}
+                        onClick={() =>
+                          onQueryChange({ sort: query.sort === 'asc' ? 'desc' : 'asc' })
+                        }
+                      >
+                        {column.label}
+                      </TableSortLabel>
+                    ) : (
+                      column.label
+                    )}
+                  </TableCell>
+                );
+              })}
             </TableRow>
           </TableHead>
 

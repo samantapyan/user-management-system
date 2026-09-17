@@ -226,10 +226,21 @@ a user abandoned is a bug, not a feature. An unsaved change gets a warning inste
 "The back button should do what a user expects it to" does not say what the navigation model
 is. With the modal, back closes the modal rather than leaving the screen.
 
-The part that actually matters is which changes create history entries. Changing the search
-text or a filter replaces the current entry. Opening a user pushes a new one. If every
-keystroke pushed, leaving the page would take twenty presses of back, which is the opposite
-of what a user expects.
+The part that actually matters is which changes create history entries, and I got this
+wrong the first time. My original rule was that refining the view replaces and navigating
+pushes, so search, city and sort all replaced. Changing the city four times then left one
+history entry and back had nowhere to go.
+
+The right distinction is continuous against discrete. Typing produces a state per pause in
+the keystrokes and the user chose none of them, so search replaces. Picking a city,
+toggling the sort, turning a page and changing the page size are each one deliberate
+decision, and back is how a person expects to undo a decision, so those push. It is what a
+search engine does: results update as you type without touching history, and every filter
+you click is its own entry.
+
+The cost is that ten deliberate changes are ten back presses, and that is correct, because
+they were ten choices. Pushing on every keystroke would be the other failure, where leaving
+the page takes twenty.
 
 ### 6. "Searchable by name or email" does not say how
 
@@ -248,9 +259,45 @@ exercise pagination or load. The only real condition I can reproduce is a slow n
 browser devtools.
 
 I chose pagination, and I shape the data layer like a real server: a query object goes in,
-`{ data, total }` comes out. Today the fixture is fetched once and filtered, sorted and
+`{ items, total }` comes out. Today the fixture is fetched once and filtered, sorted and
 paged on the client, behind that contract. When a real backend appears, one module changes
 and no component knows.
+
+Since the fixture cannot exercise this, I measured it instead, by generating users and
+running the real query functions and the real screen against them.
+
+| per query               |    100 |  1,000 | 10,000 |    100,000 |
+| ----------------------- | -----: | -----: | -----: | ---------: |
+| parse and validate      | 0.5 ms | 2.6 ms | 6.2 ms |      43 ms |
+| page 1, sorted          | 0.1 ms | 1.7 ms |  20 ms | **214 ms** |
+| search matching many    | 0.03ms | 0.3 ms | 3.1 ms |      31 ms |
+| search matching nothing | 0.02ms | 0.1 ms | 1.1 ms |      11 ms |
+| cities for the dropdown | 0.01ms | 0.03ms | 0.2 ms |     2.7 ms |
+
+In the browser, with the real screen and a stubbed API: at 10,000 rows nothing blocks the
+main thread for more than 50ms at all. At 100,000 the longest blocking task is 242ms, and
+Lighthouse's mobile profile throttles the CPU four times, so on a mid-range phone that is
+closer to a second of frozen interface per query.
+
+Sorting is nearly all of the cost, and nearly all of the sorting is the collator. On 10,000
+rows the whole query is 20ms and 17.8ms of it is the sort. The same sort with a plain `<`
+comparison takes 4.2ms, so ordering non-ASCII names correctly costs about four times as
+much. That is worth paying, and worth knowing you are paying.
+
+Filtering before sorting is doing real work, which the numbers show: a search matching
+nothing costs 11ms at 100,000 rows against 214ms for no filter, because there is nothing
+left to sort.
+
+**So the honest limit is around ten thousand rows.** Below it this screen is
+indistinguishable from the ten-row fixture. Above it, search, sort and paging have to move
+to the server, which is what the `{ items, total }` contract is for.
+
+There is an optimisation available and I deliberately did not take it. Sorting once per
+direction and caching it, then filtering the sorted array, would turn 214ms per query into
+214ms once and about 30ms after, because filtering preserves order. It would also add a
+module-level cache with identity-based invalidation to a pure module, to speed up a size the
+architecture already says belongs on the server. Making the wrong answer survive longer is
+not an optimisation.
 
 ### 8. "Never fails", and also "hold up when a request fails"
 
@@ -344,6 +391,11 @@ page.
 Local edits are only correct while the entire dataset is on the client. Past that, the edit
 has to reach the server. I would rather name the limit than build something that quietly
 breaks at the size the task asks me to build for.
+
+The measurements in gap 7 put a number on it. The whole dataset stays viable on the client
+to roughly ten thousand rows, and local edits stay correct only while the whole dataset is
+on the client. Those are the same number, so ten thousand rows is where this design stops
+working, not where it starts to feel slow.
 
 ### 16. No validation rules for the new name
 
@@ -547,6 +599,31 @@ not solved rather than one I decided.
 the users currently in memory. That is correct while the whole dataset is on the client, and
 wrong the moment it is paginated on a server. The wrongness is quiet, which is the bad part:
 the filter simply stops offering cities that exist, and nothing looks broken.
+
+**A failed background refresh is silent.** When a cached view goes stale and its refresh
+fails, TanStack Query keeps the data it already has rather than blanking the screen, which
+is right. But nothing tells the user their rows are now older than they look, so they can
+sit on stale data indefinitely with a working-looking interface. Found while testing the
+error state: breaking the network and re-requesting a cached view changes nothing on
+screen. A real product would show a quiet "could not refresh" marker with a retry.
+
+**One long value used to break the layout for every row, and still can.** The table has
+`white-space: nowrap` and a minimum width, so a very long name or email makes its column
+wide and squeezes the others. Measured with a 120 character name: the table went from 974px
+to 1663px and the Company column was pushed off screen on every row. `table-layout: fixed`
+plus `text-overflow: ellipsis` fixes it in two lines and I have not applied it.
+
+**The users list is requested twice on first load.** `listUsers` and `listCities` both need
+the whole dataset, and they are separate calls because a real backend would answer them
+from separate endpoints, which is what makes that day a change to one module. Against this
+fixture it means two identical requests, usually served from the browser cache the second
+time. Measured: two requests, 36ms and 47ms.
+
+**The scrollable table region is always a tab stop.** It carries `tabIndex={0}` so keyboard
+users can scroll it, which is correct when it scrolls. On a desktop width it does not
+scroll, so it is a focus stop that does nothing. Doing this properly means measuring
+overflow with a `ResizeObserver`, which is more machinery than the problem deserves, so it
+stays as a known trade-off.
 
 More will be added here as the code is written, because that is when the rest of them appear.
 

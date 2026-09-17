@@ -1,8 +1,5 @@
+import { collator } from './collator';
 import type { SortDirection, User } from './types';
-
-// Built once, not per comparison. A sort calls the comparator O(n log n) times and
-// constructing a collator is expensive.
-const collator = new Intl.Collator(undefined, { numeric: true });
 
 /**
  * Comparing with `<` orders by code point, which sorts every accented letter after Z.

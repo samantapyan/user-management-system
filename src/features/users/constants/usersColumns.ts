@@ -13,16 +13,28 @@ import type { User } from '../model/types';
  * render arbitrary elements stops being configuration and becomes a framework. If one
  * column later needs a link or a chip, give this type an optional `render` then.
  */
+
+type UserColumnId = 'name' | 'email' | 'city' | 'company';
+
 type UserColumn = {
-  id: 'name' | 'email' | 'city' | 'company';
+  id: UserColumnId;
   label: string;
   /** Percentages, so the layout holds as the container resizes. They add up to 100. */
   width: string;
   value: (user: User) => string;
-  sortable?: boolean;
   /** Rendered as `th scope="row"`, so a screen reader can name the row it is reading. */
   isRowHeader?: boolean;
 };
+
+/**
+ * The one column the table can sort by, named here rather than flagged per column.
+ *
+ * `UsersQuery` carries a direction and no field, so exactly one column can be sortable.
+ * A `sortable?: boolean` on every column would say otherwise, and setting it on a second
+ * column would render two headers both marked as the active sort, both toggling this
+ * one. Adding a second sortable column means adding `sortBy` to `UsersQuery` first.
+ */
+export const SORTABLE_COLUMN_ID: UserColumnId = 'name';
 
 export const USERS_COLUMNS: readonly UserColumn[] = [
   {
@@ -30,7 +42,6 @@ export const USERS_COLUMNS: readonly UserColumn[] = [
     label: 'Name',
     width: '28%',
     value: (user) => user.name,
-    sortable: true,
     isRowHeader: true,
   },
   { id: 'email', label: 'Email', width: '30%', value: (user) => user.email },

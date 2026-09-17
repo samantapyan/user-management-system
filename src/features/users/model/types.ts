@@ -37,6 +37,9 @@ export type UsersTableQueryPatch = Partial<
   Pick<UsersQuery, 'sort' | 'page' | 'pageSize'>
 >;
 
+/** And the mirror of it: the filters cannot reach sorting or paging. */
+export type UsersFiltersQueryPatch = Partial<Pick<UsersQuery, 'search' | 'city'>>;
+
 export type UsersResponse = {
   items: User[];
   /** Matching the query before paging, not the number of rows in `items`. */
