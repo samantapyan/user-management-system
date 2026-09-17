@@ -54,8 +54,22 @@ export type UserEdit = {
 /** Keyed by user id as a string, because that is what a JSON object key is. */
 export type UserEdits = Record<string, UserEdit>;
 
-export type UsersResponse = {
+/** What the search, sort and paging work produces. */
+export type UsersPage = {
   items: User[];
   /** Matching the query before paging, not the number of rows in `items`. */
   total: number;
+};
+
+/**
+ * What `api/` answers with.
+ *
+ * `editedIds` travels with the rows rather than being read from the store separately, and
+ * that is the point: the rows are cached under the overlay that produced them, so a marker
+ * read live from the store describes a different overlay than the names beside it for as
+ * long as the next fetch takes. One source, no window. It goes the day a write endpoint
+ * exists, together with the overlay it describes.
+ */
+export type UsersResponse = UsersPage & {
+  editedIds: number[];
 };

@@ -1,4 +1,4 @@
-import type { UserEdit, UserEdits, UsersQuery } from '../model/types';
+import type { UserEdits, UsersQuery } from '../model/types';
 
 /**
  * Every cache key this feature uses, built from one root.
@@ -17,7 +17,11 @@ export const usersKeys = {
   list: (query: UsersQuery, edits: UserEdits) =>
     [...usersKeys.all, 'list', query, edits] as const,
   cities: () => [...usersKeys.all, 'cities'] as const,
-  /** Only this user's edit, so renaming one user does not invalidate the others. */
-  detail: (id: number, edit: UserEdit | undefined) =>
-    [...usersKeys.all, 'detail', id, edit ?? null] as const,
+  /**
+   * No overlay here, unlike the list. The list's answer depends on it, because the search
+   * and the sort run over renamed values; one user's detail does not, so the overlay goes
+   * on after the cache rather than inside its key. Keyed by it, every rename threw away a
+   * cached user and fetched it again to change one string.
+   */
+  detail: (id: number) => [...usersKeys.all, 'detail', id] as const,
 };

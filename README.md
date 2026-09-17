@@ -241,6 +241,14 @@ I decided yes, and all of them live in the URL, so a reload gives back the same 
 I deliberately do **not** restore a half typed name that was never saved. Bringing back text
 a user abandoned is a bug, not a feature. An unsaved change gets a warning instead.
 
+The warning covers every way out of the dialog, because there is only one: the dialog is
+opened and closed by a URL parameter, so Escape, the backdrop, the Close button and the
+browser's back button are all the same navigation, and one `useBlocker` sees all four.
+Guarding the component's own close handler instead would have covered three of them and let
+the back button throw the edit away without a word. It does not cover a reload or closing
+the tab; that needs `beforeunload`, whose prompt the browser writes and the page cannot
+word, and I would rather leave it out and say so than ship a dialog I do not control.
+
 ### 5. The back button, with no navigation model specified
 
 "The back button should do what a user expects it to" does not say what the navigation model
@@ -252,11 +260,22 @@ pushes, so search, city and sort all replaced. Changing the city four times then
 history entry and back had nowhere to go.
 
 The right distinction is continuous against discrete. Typing produces a state per pause in
-the keystrokes and the user chose none of them, so search replaces. Picking a city,
-toggling the sort, turning a page and changing the page size are each one deliberate
+the keystrokes and the user chose none of them, so refining a search replaces. Picking a
+city, toggling the sort, turning a page and changing the page size are each one deliberate
 decision, and back is how a person expects to undo a decision, so those push. It is what a
 search engine does: results update as you type without touching history, and every filter
 you click is its own entry.
+
+Then I got the search half of it wrong too, and it took a second report to find. The rule
+only asked whether a search existed before and after, so replacing "Leanne" with "Ervin"
+counted as more typing. Three searches collapsed into one history entry and a single press
+of back threw away all three.
+
+What the rule asks now is whether this is the same term still being written: typing further
+into it, or backspacing over it, is one search being composed and replaces. A term that is
+not a continuation of the last one is a new search and pushes, as does the first one and
+clearing it again. So "L" to "Le" to "Leann" is one entry, and "Leanne" to "Ervin" to
+"Patricia" is three.
 
 The cost is that ten deliberate changes are ten back presses, and that is correct, because
 they were ten choices. Pushing on every keystroke would be the other failure, where leaving
@@ -684,12 +703,14 @@ from separate endpoints, which is what makes that day a change to one module. Ag
 fixture it means two identical requests, usually served from the browser cache the second
 time. Measured: two requests, 36ms and 47ms.
 
-**Renaming re-runs the list query, request included.** The overlay is part of the query
-key, which is what makes search and sort see the new name, and it has the pleasant side
-effect that undoing a rename lands back on a result already in the cache. The cost is that a
-purely local change creates a new cache entry and a new fetch, usually served from the
-browser cache. With a real write endpoint the rename would be a mutation and this goes away.
-Against a fixture it is a request that did not need to happen.
+**Renaming re-runs the list query, request included.** The overlay is part of the list's
+query key, which is what makes search and sort see the new name, and it has the pleasant
+side effect that undoing a rename lands back on a result already in the cache. The cost is
+that a purely local change creates a new cache entry and a fetch, usually served from the
+browser cache. Measured: one request per rename. It was three until the detail query stopped
+carrying the overlay in its key, which bought nothing there, because a single user's detail
+does no searching or sorting. With a real write endpoint the rename becomes a mutation and
+the last one goes too.
 
 **The scrollable table region is always a tab stop.** It carries `tabIndex={0}` so keyboard
 users can scroll it, which is correct when it scrolls. On a desktop width it does not

@@ -1,4 +1,4 @@
-import { useState, type ReactNode } from 'react';
+import { useCallback, useRef, useState, type ReactNode } from 'react';
 import Alert from '@mui/material/Alert';
 import Box from '@mui/material/Box';
 import Button from '@mui/material/Button';
@@ -14,6 +14,7 @@ import Skeleton from '@mui/material/Skeleton';
 import Tooltip from '@mui/material/Tooltip';
 import Typography from '@mui/material/Typography';
 import { visuallyHidden } from '@mui/utils';
+import { useBlocker } from 'react-router';
 import { errorMessage } from '@/shared/lib/http';
 import { useUserQuery } from '../api/useUserQuery';
 import { USER_DETAIL_FIELDS } from '../constants/userDetailFields';
@@ -77,38 +78,58 @@ export function UserDetailDialog({ userId, fromRow, onClose }: UserDetailDialogP
   const isEdited = findEdit(useUserEdits(), userId) !== undefined;
 
   const [isEditing, setIsEditing] = useState(false);
-  const [hasUnsavedInput, setHasUnsavedInput] = useState(false);
-  const [isConfirmingDiscard, setIsConfirmingDiscard] = useState(false);
   const [storageRefused, setStorageRefused] = useState(false);
 
+  /*
+   * A ref rather than state, for two reasons. Nothing renders from it, and more
+   * importantly the blocker below is asked for the answer during an event, before React
+   * has re-rendered: discarding sets this false and navigates in the same handler, and
+   * with state the blocker would still see the old value and block our own close.
+   */
+  const hasUnsavedInput = useRef(false);
+
+  /*
+   * One guard for every way out, because this dialog is opened and closed by a URL
+   * parameter. Escape, the backdrop, the Close button and the browser's back button all
+   * end as the same navigation, so guarding the component's own close handler would have
+   * covered three of the four and let the back button throw the edit away in silence.
+   *
+   * What it does not cover is a reload or closing the tab. That needs `beforeunload`,
+   * whose prompt the browser writes and the page cannot word, so it is left out and said
+   * out loud in the README instead.
+   */
+  const blocker = useBlocker(useCallback(() => hasUnsavedInput.current, []));
+  const isBlocked = blocker.state === 'blocked';
+
+  const markUnsaved = useCallback((value: boolean) => {
+    hasUnsavedInput.current = value;
+  }, []);
+
   function leaveEditMode(): void {
+    hasUnsavedInput.current = false;
     setIsEditing(false);
-    setHasUnsavedInput(false);
-    setIsConfirmingDiscard(false);
+  }
+
+  function keepEditing(): void {
+    if (blocker.state === 'blocked') {
+      blocker.reset();
+    }
   }
 
   /*
-   * Closing with something half typed asks first. The alternative people reach for is to
-   * keep the draft and put it back next time, and that is worse: text the user walked
-   * away from reappears later with no explanation, and they cannot tell it from a value
-   * that was actually saved.
+   * Deliberately does not keep the draft to put back next time. Text the user walked away
+   * from reappearing later, indistinguishable from a value that was actually saved, is a
+   * bug wearing a feature's clothes.
    */
-  function requestClose(): void {
-    if (isEditing && hasUnsavedInput) {
-      setIsConfirmingDiscard(true);
-      return;
+  function discard(): void {
+    leaveEditMode();
+    if (blocker.state === 'blocked') {
+      blocker.proceed();
     }
-    onClose();
   }
 
   return (
-    <Dialog
-      open
-      onClose={requestClose}
-      aria-labelledby={TITLE_ID}
-      fullWidth
-      maxWidth="sm"
-    >
+    <Dialog open onClose={onClose} aria-labelledby={TITLE_ID} fullWidth maxWidth="sm">
       {/* A div, because while editing this holds a form, and a form inside an `h2` is
           not valid HTML. The heading is still in there, as its own element. */}
       <DialogTitle component="div" id={TITLE_BLOCK_ID} sx={titleSx}>
@@ -138,7 +159,7 @@ export function UserDetailDialog({ userId, fromRow, onClose }: UserDetailDialogP
               leaveEditMode();
             }}
             onCancel={leaveEditMode}
-            onDirtyChange={setHasUnsavedInput}
+            onDirtyChange={markUnsaved}
           />
         ) : (
           <Box sx={controlsSx}>
@@ -243,27 +264,17 @@ export function UserDetailDialog({ userId, fromRow, onClose }: UserDetailDialogP
             Undo rename
           </Button>
         )}
-        <Button onClick={requestClose}>Close</Button>
+        <Button onClick={onClose}>Close</Button>
       </DialogActions>
 
-      <Dialog
-        open={isConfirmingDiscard}
-        onClose={() => setIsConfirmingDiscard(false)}
-        aria-labelledby={DISCARD_TITLE_ID}
-      >
+      <Dialog open={isBlocked} onClose={keepEditing} aria-labelledby={DISCARD_TITLE_ID}>
         <DialogTitle id={DISCARD_TITLE_ID}>Discard your changes?</DialogTitle>
         <DialogContent>
           <DialogContentText>The name you typed has not been saved.</DialogContentText>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setIsConfirmingDiscard(false)}>Keep editing</Button>
-          <Button
-            color="error"
-            onClick={() => {
-              leaveEditMode();
-              onClose();
-            }}
-          >
+          <Button onClick={keepEditing}>Keep editing</Button>
+          <Button color="error" onClick={discard}>
             Discard
           </Button>
         </DialogActions>

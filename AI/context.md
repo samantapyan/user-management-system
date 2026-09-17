@@ -85,7 +85,6 @@ src/
     config.ts           anything that changes between environments
     ui/                 components more than one feature would need
     lib/                helpers more than one feature would need
-  test/                 setup and fixtures
 ```
 
 **Grouped by feature, not by file type.** A top level `components/`, `hooks/`, `utils/`
@@ -181,8 +180,12 @@ design system on top of MUI, stop.
 - **Making a deliberate user action replace the history entry instead of pushing one.**
   Only continuous typing replaces, because it produces states the user never chose. A
   filter, a sort, a page and a page size are each one decision, and back is how people
-  undo a decision. This was got wrong once already: everything but paging replaced, so
-  changing the city four times left one entry and back had nowhere to go.
+  undo a decision. This was got wrong twice. First everything but paging replaced, so
+  changing the city four times left one entry and back had nowhere to go. Then search
+  replaced whenever a search existed before and after, which made swapping "Leanne" for
+  "Ervin" look like more typing and collapsed three searches into one entry. The rule now
+  asks whether the new term continues the old one in either direction; anything else is a
+  new search and pushes.
 - **Deleting the loading, empty, no-results or error states** because the fixture always
   succeeds. They exist for the API this will meet, not the one it has, and two of them are
   reachable today with a query string.
@@ -208,9 +211,44 @@ Work goes straight to `main`. This is a solo repo, so a branch would only add me
 to a history that is itself part of what is being delivered. On a team repo this would be
 short lived branches with a pull request per change and protection on `main`.
 
-## Not in this file yet
+## Traps this codebase has already sprung
 
-The traps that only exist once the code does. Rather than invent them, this section stays
-open and is filled in as they turn up: the order the local edit overlay has to be applied
-in, what actually stops a stale response from landing, and anything else that proves easy
-to get wrong.
+Every one of these was a real bug here, not a hypothetical. They are the reason to read
+this file rather than infer the conventions from the code.
+
+**The local edit overlay goes on before the search and the sort, never after.**
+`usersApi.listUsers` merges it and then calls `queryUsers`, in that order, and the order is
+the whole feature. Merge afterwards and the row shows the new name while the filtering and
+sorting still run on the old one, so searching for the name on screen finds nothing and the
+row sorts under a value nobody can see. It reads as three unrelated bugs and it is one line
+in the wrong place. `model/applyEdits.ts` says the same thing at the top.
+
+**What stops a stale response is the query key, not the abort signal.** The whole
+`UsersQuery` object is the key, so a slow answer for an older view belongs to a different
+cache entry and physically cannot overwrite a newer one. The signal only saves wasted work;
+the state would still be correct without it. Narrowing the key to "search" or "page"
+reintroduces the race, and it will not show up on a fixture that answers in 30ms.
+
+**`getSnapshot` must return the same reference until the value really changes.**
+`model/userEdits.ts` keeps the parsed overlay in a module variable. Reading `localStorage`
+inside the getter hands back a new object every call, which `useSyncExternalStore` reads as
+a change on every render, and it loops until React gives up. The same file reads lazily
+rather than at import, so everything in `model/` stays importable without a browser.
+
+**The dialog is a URL parameter, so a guard on its close handler is not a guard.** Escape,
+the backdrop, the Close button and the browser's back button all end as the same
+navigation. An unsaved rename is protected by one `useBlocker`, which sees all four. The
+first version checked the component's own close path and let the back button discard the
+edit in silence.
+
+**MUI puts the dialog's `aria-labelledby` id on `DialogTitle` unless you give it one.**
+The heading inside it then shares that id, two elements answer to it, the outer one wins,
+and the dialog's accessible name becomes the heading plus every word of whatever else is in
+the title row. Lighthouse scores accessibility 100 with this present. So does the focus
+outline bug the theme fixes: `MuiButtonBase` sets `outline: 0` at the same specificity as a
+global focus rule and is injected after it. Neither is caught by a score; both were caught
+by tabbing through and reading computed styles.
+
+**A percentage width on a column that holds a control.** The table is `table-layout: fixed`
+and the actions column is `64px`, not a share of the table, because a share shrinks below
+the button it exists to hold.

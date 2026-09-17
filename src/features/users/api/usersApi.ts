@@ -1,16 +1,10 @@
 import { config } from '@/shared/config';
 import { getJson, HttpError } from '@/shared/lib/http';
-import { applyEdit, applyEdits } from '../model/applyEdits';
+import { applyEdits, findEdit } from '../model/applyEdits';
 import { distinctCities } from '../model/cityOptions';
 import { queryUsers } from '../model/queryUsers';
 import { usersResponseSchema } from '../model/schemas';
-import type {
-  User,
-  UserEdit,
-  UserEdits,
-  UsersQuery,
-  UsersResponse,
-} from '../model/types';
+import type { User, UserEdits, UsersQuery, UsersResponse } from '../model/types';
 
 /**
  * Query in, page and total out. There is no server that can do any of it yet, so the
@@ -47,7 +41,16 @@ export async function listUsers(
   signal?: AbortSignal,
 ): Promise<UsersResponse> {
   const users = applyEdits(await fetchAllUsers(signal), edits);
-  return queryUsers(users, query);
+  const page = queryUsers(users, query);
+
+  // Which of the rows being returned were renamed, reported alongside them rather than
+  // left for the screen to work out from a store that may have moved on since.
+  return {
+    ...page,
+    editedIds: page.items
+      .filter((user) => findEdit(edits, user.id) !== undefined)
+      .map((user) => user.id),
+  };
 }
 
 /**
@@ -71,12 +74,7 @@ export async function listCities(signal?: AbortSignal): Promise<string[]> {
  * been deleted is an ordinary thing to happen, not a failure of the request, and the two
  * deserve different messages on screen.
  */
-export async function getUser(
-  id: number,
-  edit: UserEdit | undefined,
-  signal?: AbortSignal,
-): Promise<User | null> {
+export async function getUser(id: number, signal?: AbortSignal): Promise<User | null> {
   const users = await fetchAllUsers(signal);
-  const user = users.find((candidate) => candidate.id === id);
-  return user === undefined ? null : applyEdit(user, edit);
+  return users.find((candidate) => candidate.id === id) ?? null;
 }

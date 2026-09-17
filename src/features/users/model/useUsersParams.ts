@@ -12,9 +12,15 @@ import { DEFAULT_QUERY, parseUsersQuery, usersQueryToParams } from './usersParam
  * Search is the only thing that is not a single choice, and it needs a finer rule than
  * "always" or "never". Pushing on every pause in the typing would put "l", "le" and "lea"
  * in history and take twenty presses of back to leave. Never pushing means a user who
- * searched cannot get back to the full list the way they expect. So the transition is
- * what counts: starting a search and ending one are decisions, changing the term inside
- * one is still typing.
+ * searched cannot get back to the full list the way they expect.
+ *
+ * So what counts is whether this is the same term still being written. Typing further
+ * into it, or backspacing over it, is one search being composed and replaces. Anything
+ * else is a new search and pushes, including the first one and clearing it again.
+ *
+ * The earlier rule only asked whether a search existed before and after, which made
+ * "Leanne" to "Ervin" look like more typing, so three searches collapsed into one entry
+ * and one press of back threw away all three.
  */
 function historyModeFor(
   patch: Partial<UsersQuery>,
@@ -25,9 +31,15 @@ function historyModeFor(
     return { replace: false };
   }
 
-  const hadSearch = current.search.trim() !== '';
-  const hasSearch = (patch.search ?? '').trim() !== '';
-  return { replace: hadSearch === hasSearch };
+  const before = current.search.trim();
+  const after = (patch.search ?? '').trim();
+
+  const isSameTermStillBeingTyped =
+    before !== '' &&
+    after !== '' &&
+    (after.startsWith(before) || before.startsWith(after));
+
+  return { replace: isSameTermStillBeingTyped };
 }
 
 /** The view lives in the URL, so a reload, the back button and a shared link all work. */

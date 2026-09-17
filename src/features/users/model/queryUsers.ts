@@ -1,5 +1,5 @@
 import { compareUsersByName } from './sortUsers';
-import type { User, UsersQuery, UsersResponse } from './types';
+import type { User, UsersPage, UsersQuery } from './types';
 
 /**
  * The work a server would do: search, filter, sort, then page.
@@ -8,7 +8,7 @@ import type { User, UsersQuery, UsersResponse } from './types';
  * after and a renamed row shows the new name while search and sort still use the old
  * one, which looks like three unrelated bugs.
  */
-export function queryUsers(users: readonly User[], query: UsersQuery): UsersResponse {
+export function queryUsers(users: readonly User[], query: UsersQuery): UsersPage {
   const term = query.search.trim().toLocaleLowerCase();
 
   const matched = users.filter(

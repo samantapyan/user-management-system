@@ -23,14 +23,18 @@ const storage = createStorage<UserEdits>({
 });
 
 /**
- * Read once, then kept in memory.
+ * Read once, on the first question, then kept in memory.
  *
- * `getSnapshot` has to return the same reference until the value actually changes, or
- * `useSyncExternalStore` sees a new object on every render and loops until React gives up.
- * Reading from `localStorage` in the getter would do exactly that, because `JSON.parse`
- * hands back a new object every time.
+ * Kept, because `getSnapshot` has to return the same reference until the value actually
+ * changes: reading from `localStorage` on every call hands back a new object each time,
+ * which makes `useSyncExternalStore` see a change on every render and loop until React
+ * gives up.
+ *
+ * Lazy, because reading at module scope would touch `localStorage` on import. Every other
+ * file in `model/` can be imported and tested with no browser at all, and one that cannot
+ * be is the one nobody writes a test for.
  */
-let snapshot: UserEdits = storage.read();
+let snapshot: UserEdits | null = null;
 
 const listeners = new Set<() => void>();
 let stopListeningToOtherTabs: (() => void) | null = null;
@@ -58,6 +62,7 @@ function subscribe(onStoreChange: () => void): () => void {
 }
 
 function getSnapshot(): UserEdits {
+  snapshot ??= storage.read();
   return snapshot;
 }
 
@@ -77,11 +82,11 @@ function commit(next: UserEdits): boolean {
 }
 
 export function saveUserName(id: number, name: string): boolean {
-  return commit({ ...snapshot, [editKey(id)]: { name } });
+  return commit({ ...getSnapshot(), [editKey(id)]: { name } });
 }
 
 export function revertUser(id: number): boolean {
-  const { [editKey(id)]: removed, ...rest } = snapshot;
+  const { [editKey(id)]: removed, ...rest } = getSnapshot();
   // Nothing to do, and committing would tell every subscriber to re-render for nothing.
   if (removed === undefined) return true;
   return commit(rest);

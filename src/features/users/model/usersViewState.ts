@@ -22,6 +22,8 @@ export type UsersViewState =
   | {
       status: 'ready';
       users: User[];
+      /** Of `users`, the ones showing a locally renamed value. */
+      editedIds: number[];
       total: number;
       /** A newer query is in flight and the rows below belong to the previous one. */
       isRefreshing: boolean;
@@ -77,6 +79,7 @@ export function resolveUsersViewState(
   return {
     status: 'ready',
     users: result.data?.items ?? [],
+    editedIds: result.data?.editedIds ?? [],
     total,
     isRefreshing: result.isPlaceholderData,
     // Still retrying is not yet a failure, so it only counts once fetching has stopped.
