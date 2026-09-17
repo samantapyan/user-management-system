@@ -6,6 +6,7 @@ import { useUsersQuery } from '../api/useUsersQuery';
 import { useOpenUser } from '../model/useOpenUser';
 import { useUsersParams } from '../model/useUsersParams';
 import { DEFAULT_QUERY } from '../model/usersParams';
+import { useUserEdits } from '../model/userEdits';
 import { resolveUsersViewState } from '../model/usersViewState';
 import { UserDetailDialog } from './UserDetailDialog';
 import { UsersFilters } from './UsersFilters';
@@ -24,6 +25,7 @@ export function UsersScreen() {
   const usersQuery = useUsersQuery(query);
   const citiesQuery = useCitiesQuery();
   const { openUserId, openUser, closeUser } = useOpenUser();
+  const edits = useUserEdits();
 
   const state = resolveUsersViewState(usersQuery, query);
 
@@ -68,6 +70,7 @@ export function UsersScreen() {
         <UsersTable
           state={state}
           query={query}
+          edits={edits}
           onQueryChange={setQuery}
           onClearFilters={clearFilters}
           onRetry={retry}

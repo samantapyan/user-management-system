@@ -147,26 +147,46 @@ gains a line instead of the app gaining a router. And third, consistency: the da
 already written for the API this will meet rather than the fixture it has, and building the
 navigation for only the screen that exists today would contradict that in the same codebase.
 
+**React Hook Form, for one field.** One text input hardly needs a form library and I would
+not have added it for that alone. What it carries is the requirement that an unsaved rename
+is not silently lost, which needs a reliable answer to "has this been changed", and hand
+rolled dirty tracking is exactly the kind of thing that quietly rots. It also takes the zod
+schema directly, so one object decides whether Save is enabled, what the message under the
+field says, and what value is written. Uncontrolled by default, so typing does not re-render
+the dialog around it.
+
+**localStorage, not IndexedDB.** The edits are a few hundred bytes, scoped to one person,
+and needed synchronously before the first paint. IndexedDB is asynchronous and is the right
+answer for offline support or thousands of cached records, and neither is asked for here.
+What localStorage does need is defending: it outlives deploys, so today's code reads what
+last month's code wrote, a user can edit it by hand, and the browser can refuse both reads
+and writes. So the stored value carries a version, what comes back is validated with zod
+before it is trusted, and a refused write is reported on screen rather than swallowed.
+
 **What they cost.** Zod and TanStack Query together added 30kB raw and 9kB gzipped. React
 Router added 98kB raw and 31kB gzipped, which is the largest single cost in the project after
-MUI and by some distance the most arguable. All measured before and after, not estimated.
+MUI and by some distance the most arguable. React Hook Form and its zod resolver added 39kB
+raw and 13kB gzipped. All measured before and after, not estimated.
 
 The build splits dependencies from application code, because the two change at completely
 different rates and a deploy should not throw away a browser's cached copy of React:
 
 ```
-index    10kB raw    5kB gzipped     the application
-vendor  136kB raw   40kB gzipped     zod, TanStack Query
-mui     229kB raw   72kB gzipped     MUI and emotion
+index    22kB raw    9kB gzipped     the application
+vendor  175kB raw   53kB gzipped     zod, TanStack Query, React Hook Form
+mui     295kB raw   92kB gzipped     MUI and emotion
 react   323kB raw  101kB gzipped     React, React DOM, React Router
 ```
 
-218kB gzipped in total is a lot for one screen, and almost all of it is the component
-library. That is the price of the MUI decision above, stated rather than hidden.
+256kB gzipped in total is a lot for one screen, and almost all of it is the component
+library. The MUI chunk alone grew 20kB gzipped across the detail view and the rename, purely
+from the components those needed: a dialog, a tooltip, a chip, a text field. That is the
+price of the MUI decision above, stated rather than hidden.
 
-**Planned, not yet installed:** React Hook Form, for the rename. Vitest and React Testing
-Library. Each lands in the commit that needs it, so the history shows why it arrived rather
-than a dependency list appearing on day one for reasons nobody can reconstruct.
+**Added when it was needed, not on day one.** React Hook Form arrived in the commit that
+uses it, so the history shows what it was for rather than a dependency list appearing on the
+first day for reasons nobody can reconstruct afterwards. Vitest and React Testing Library
+were planned the same way and never arrived; the tests section says what happened instead.
 
 ## Gaps and contradictions in the requirements
 
@@ -416,9 +436,13 @@ rather than left for the reader to work out whether I ran out of time or decided
 
 ### 18. Two tabs open at once
 
-Nothing says what should happen if the same user is edited in two tabs. The last write wins
-and the other tab does not necessarily agree. This one I have not fully solved rather than
-decided, so it is in "What is still wrong with this" rather than here.
+Nothing says what should happen if the same user is edited in two tabs. Half of it is
+answered: the edit store listens for the browser's `storage` event, so a rename in one tab
+reaches every other tab on the same screen and they agree without a reload.
+
+The collision itself is not answered. Two tabs renaming the same user at the same moment is
+last write wins, with no merge and nothing telling either of them it happened. That half is
+in "What is still wrong with this", because I did not solve it rather than decided it.
 
 ## Assumptions
 
@@ -490,7 +514,6 @@ src/
     config.ts     anything that changes between environments
     ui/           components more than one feature would need
     lib/          helpers more than one feature would need
-  test/           setup and fixtures
 ```
 
 Grouped by feature rather than by file type. A top level `components/`, `hooks/`, `utils/`
@@ -522,15 +545,22 @@ and measuring it tells you nothing about what users get.
 ```
                 Performance  Accessibility  Best practices  SEO
 desktop             100           100            100        100
-mobile               89           100            100        100
+mobile               84           100            100        100
 ```
 
-Mobile performance is 89 because of script parse and execution on a throttled CPU, not
-because of anything on the screen. Largest Contentful Paint is 3.1s and Total Blocking Time
-is 200ms, and both are the cost of React, MUI and React Router being parsed before anything
-renders. That is the price of the library choices above, and the only real ways down from
-here are server rendering or fewer dependencies, both of which are decisions already made
-and explained.
+Mobile performance is 84 because of script parse and execution on a throttled CPU, not
+because of anything on the screen. Largest Contentful Paint is 3.4s and Total Blocking Time
+is 280ms, and both are the cost of React, MUI and React Router being parsed before anything
+renders. It was 89 before the detail view and the rename, and the difference is the extra
+MUI components those needed, which is the same 20kB described in the stack section arriving
+in a different unit. That is the price of the library choices above, and the only real ways
+down from here are server rendering or fewer dependencies, both of which are decisions
+already made and explained.
+
+Layout shift is 0 on desktop and 0.021 on mobile, comfortably inside the 0.1 threshold. The
+mobile figure is the pagination row settling once the real row count replaces the loading
+one, and I measured it against the build from before this work to be sure it was not
+something I had introduced: it was 0.022 then.
 
 To reproduce any of this:
 
@@ -539,9 +569,12 @@ npm run build && npm run preview
 npx lighthouse http://localhost:4173 --view
 ```
 
-**Sizes**, in Chrome: 375 x 812, 1024 x 768 and 1280 x 800. Below roughly 640px the table
-scrolls sideways inside its container rather than squeezing four columns into a phone, the
-page itself never scrolls sideways, and every row stays one line high.
+**Sizes**, in Chrome: 320, 375, 430, 1024 and 1280 wide. Below roughly 690px the table
+scrolls sideways inside its container rather than squeezing five columns into a phone, the
+page itself never scrolls sideways at any width, nothing on the page is a nested vertical
+scroller, and every row stays one line high. The detail view's heading holds the name and
+the edit control on one line and shortens the name, rather than dropping the control to a
+line of its own, which matters because a renamed user can be sixty characters long.
 
 **Keyboard**, tabbing through the whole screen and recording where focus landed and what it
 looked like at each stop. Order is scroll region, then the sort header, then rows per page,
@@ -555,6 +588,18 @@ header and the page size select had **no visible focus indicator at all**. Light
 accessibility 100 with that bug present, because it does not test whether a focus style is
 actually visible. It is fixed in the theme, and I only found it because I tabbed through and
 read the computed outline rather than trusting the score.
+
+**The detail view and the rename form**, checked the same way. The dialog is named by its
+heading, the field is labelled, an invalid value sets `aria-invalid` with the reason tied to
+the field rather than only shown in red, Save is disabled while it is invalid so nobody
+submits into a wall, and each row's button is named after its user so somebody listing the
+buttons on the page hears which one opens whom.
+
+This is where the second check earned its keep. MUI stamps the dialog's `aria-labelledby`
+value onto `DialogTitle` itself unless it is given an id of its own, so the heading inside
+it and the block around it both answered to the same id. The outer one won, and while the
+rename form was open the dialog's accessible name became the heading followed by every word
+of the form. Lighthouse scored accessibility 100 with that present as well.
 
 **Colour scheme**, both light and dark through `prefers-color-scheme` emulation. Light and
 dark are CSS media queries with no JavaScript, so there is no flash of the wrong scheme.
@@ -577,40 +622,74 @@ live region, and the empty state's cell spans the real number of columns.
 
 ## Tests
 
-Tests go on the two things that are genuinely hard here: that a slow response for an old
-query can never overwrite a newer one, and that a locally renamed user is what search and
-sort actually use. Test names are written as sentences, so the list of tests reads as a list
-of decisions rather than a list of components.
+**There is no test runner in this repository, and no test files. That is the weakest part of
+what I am handing over, so it gets said plainly rather than buried.**
 
-Nothing else gets a test. A deliberate skip is worth more than a test that renders a
-component and asserts nothing.
+What exists instead is six executable check suites, 123 assertions, run against the real
+modules after every change while building. They cover the parts that are genuinely hard:
+
+- the query pipeline: search, city filter, sort, the collator against a plain comparison,
+  paging, page clamping, stable order for duplicate names, the live endpoint, cancellation
+- the URL contract in both directions, including a hand edited URL that must not break the
+  screen
+- the view state machine: one state at a time, and a failed refresh that keeps real rows
+  while discarding borrowed ones
+- the detail dialog's parameter, and the trap that a filter change must not close it
+- the edit overlay, including the trap this whole feature turns on: that search, sort and
+  paging see the renamed value, and that applying the overlay afterwards would get it wrong
+- the storage layer: a version it cannot read, a value the schema rejects, unparseable
+  JSON, a browser that refuses to read, a browser that refuses to write, and other tabs
+
+The assertions are written as sentences, so reading the output reads as a list of decisions
+rather than a list of components.
+
+What is wrong with this is not the coverage, it is the packaging. They were written as a
+harness for myself rather than as a suite for you: they live outside `src/`, they are not
+wired to `npm test`, and so you cannot run them. The checking happened and the handover did
+not, and those are not the same thing.
+
+Given more time the fix is small and specific: the same assertions under Vitest, unchanged
+in substance, plus two that need a rendered component and a fake timer, which is the only
+reason React Testing Library would come with it. What I would still not write is a test that
+mounts a component and asserts that it mounted. A deliberate skip is worth more than that.
 
 ## What is still wrong with this
 
 Written as problems are found rather than collected at the end. Two of them are already true
 from the decisions above, before any of the screen exists.
 
-**Two tabs do not agree with each other.** Local edits live in one browser, so two tabs open
-on this screen can both rename the same user and the last write wins. The other tab does not
-find out. Nothing in the requirements says what should happen here, so this is one I have
-not solved rather than one I decided.
+**Two tabs renaming at the same moment is last write wins.** A second tab does find out
+about a rename, because the edit store listens for the `storage` event. What it cannot do is
+survive a collision: if both tabs save a different name for the same user at the same time,
+one of the two is gone and neither tab says so. There is nothing to resolve the conflict
+against, because there is no server holding the real value. Nothing in the requirements says
+what should happen here, so this is one I have not solved rather than one I decided.
 
 **The city filter only knows the cities it has already loaded.** The dropdown is built from
 the users currently in memory. That is correct while the whole dataset is on the client, and
 wrong the moment it is paginated on a server. The wrongness is quiet, which is the bad part:
 the filter simply stops offering cities that exist, and nothing looks broken.
 
-**One long value used to break the layout for every row, and still can.** The table has
-`white-space: nowrap` and a minimum width, so a very long name or email makes its column
-wide and squeezes the others. Measured with a 120 character name: the table went from 974px
-to 1663px and the Company column was pushed off screen on every row. `table-layout: fixed`
-plus `text-overflow: ellipsis` fixes it in two lines and I have not applied it.
+**A truncated cell cannot be read without opening the row.** One long value used to widen
+its column and squeeze every other one: measured with a 120 character name, the table went
+from 974px to 1663px and pushed the Company column off screen on every row. That is fixed,
+with `table-layout: fixed` and `text-overflow: ellipsis`. The cost is the new problem: at
+narrow widths a long email or company is cut short, and the only way to see it in full is to
+open the detail view. A `title` on cells that actually overflow would fix it, and it needs
+measuring per cell to avoid a tooltip on text that is not truncated, so I have not done it.
 
 **The users list is requested twice on first load.** `listUsers` and `listCities` both need
 the whole dataset, and they are separate calls because a real backend would answer them
 from separate endpoints, which is what makes that day a change to one module. Against this
 fixture it means two identical requests, usually served from the browser cache the second
 time. Measured: two requests, 36ms and 47ms.
+
+**Renaming re-runs the list query, request included.** The overlay is part of the query
+key, which is what makes search and sort see the new name, and it has the pleasant side
+effect that undoing a rename lands back on a result already in the cache. The cost is that a
+purely local change creates a new cache entry and a new fetch, usually served from the
+browser cache. With a real write endpoint the rename would be a mutation and this goes away.
+Against a fixture it is a request that did not need to happen.
 
 **The scrollable table region is always a tab stop.** It carries `tabIndex={0}` so keyboard
 users can scroll it, which is correct when it scrolls. On a desktop width it does not

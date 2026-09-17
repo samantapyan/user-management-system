@@ -1,9 +1,16 @@
 import { config } from '@/shared/config';
 import { getJson, HttpError } from '@/shared/lib/http';
+import { applyEdit, applyEdits } from '../model/applyEdits';
 import { distinctCities } from '../model/cityOptions';
 import { queryUsers } from '../model/queryUsers';
 import { usersResponseSchema } from '../model/schemas';
-import type { User, UsersQuery, UsersResponse } from '../model/types';
+import type {
+  User,
+  UserEdit,
+  UserEdits,
+  UsersQuery,
+  UsersResponse,
+} from '../model/types';
 
 /**
  * Query in, page and total out. There is no server that can do any of it yet, so the
@@ -29,11 +36,18 @@ async function fetchAllUsers(signal?: AbortSignal): Promise<User[]> {
   return parsed.data;
 }
 
+/**
+ * The local renames are an input, not a decoration applied afterwards, and they are
+ * merged in on the line before the query runs. That single ordering is what makes search
+ * and sort agree with what is on screen. See `applyEdits`.
+ */
 export async function listUsers(
   query: UsersQuery,
+  edits: UserEdits,
   signal?: AbortSignal,
 ): Promise<UsersResponse> {
-  return queryUsers(await fetchAllUsers(signal), query);
+  const users = applyEdits(await fetchAllUsers(signal), edits);
+  return queryUsers(users, query);
 }
 
 /**
@@ -57,7 +71,12 @@ export async function listCities(signal?: AbortSignal): Promise<string[]> {
  * been deleted is an ordinary thing to happen, not a failure of the request, and the two
  * deserve different messages on screen.
  */
-export async function getUser(id: number, signal?: AbortSignal): Promise<User | null> {
+export async function getUser(
+  id: number,
+  edit: UserEdit | undefined,
+  signal?: AbortSignal,
+): Promise<User | null> {
   const users = await fetchAllUsers(signal);
-  return users.find((user) => user.id === id) ?? null;
+  const user = users.find((candidate) => candidate.id === id);
+  return user === undefined ? null : applyEdit(user, edit);
 }

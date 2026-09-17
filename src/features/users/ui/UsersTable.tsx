@@ -16,7 +16,8 @@ import { LiveRegion } from '@/shared/ui/LiveRegion';
 import { StatusBlock } from '@/shared/ui/StatusBlock';
 import { PAGE_SIZE_OPTIONS } from '../constants/pagination';
 import { SORTABLE_COLUMN_ID, USERS_COLUMNS } from '../constants/usersColumns';
-import type { UsersQuery, UsersTableQueryPatch } from '../model/types';
+import { findEdit } from '../model/applyEdits';
+import type { UserEdits, UsersQuery, UsersTableQueryPatch } from '../model/types';
 import { toPageSize } from '../model/usersParams';
 import type { UsersViewState } from '../model/usersViewState';
 import { UsersTableRow } from './UsersTableRow';
@@ -27,6 +28,8 @@ type UsersTableState = Exclude<UsersViewState, { status: 'error' }>;
 type UsersTableProps = {
   state: UsersTableState;
   query: UsersQuery;
+  /** Passed in rather than read here, so ten rows do not each subscribe to the store. */
+  edits: UserEdits;
   onQueryChange: (patch: UsersTableQueryPatch) => void;
   onClearFilters: () => void;
   onRetry: () => void;
@@ -115,6 +118,7 @@ const labelRowsPerPage = (
 export function UsersTable({
   state,
   query,
+  edits,
   onQueryChange,
   onClearFilters,
   onRetry,
@@ -227,7 +231,12 @@ export function UsersTable({
 
             {state.status === 'ready' &&
               state.users.map((user) => (
-                <UsersTableRow key={user.id} user={user} onOpen={onOpenUser} />
+                <UsersTableRow
+                  key={user.id}
+                  user={user}
+                  isEdited={findEdit(edits, user.id) !== undefined}
+                  onOpen={onOpenUser}
+                />
               ))}
           </TableBody>
         </Table>

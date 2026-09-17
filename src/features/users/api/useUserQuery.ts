@@ -1,5 +1,7 @@
 import { useQuery } from '@tanstack/react-query';
+import { findEdit } from '../model/applyEdits';
 import type { User } from '../model/types';
+import { useUserEdits } from '../model/userEdits';
 import { getUser } from './usersApi';
 import { usersKeys } from './usersKeys';
 
@@ -12,9 +14,11 @@ import { usersKeys } from './usersKeys';
  * there is no row, so there is no placeholder and the dialog loads normally.
  */
 export function useUserQuery(id: number, placeholder: User | undefined) {
+  const edit = findEdit(useUserEdits(), id);
+
   return useQuery({
-    queryKey: usersKeys.detail(id),
-    queryFn: ({ signal }) => getUser(id, signal),
+    queryKey: usersKeys.detail(id, edit),
+    queryFn: ({ signal }) => getUser(id, edit, signal),
     ...(placeholder === undefined ? {} : { placeholderData: placeholder }),
   });
 }

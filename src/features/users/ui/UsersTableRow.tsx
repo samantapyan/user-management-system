@@ -1,16 +1,37 @@
 import { memo } from 'react';
+import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
+import Tooltip from '@mui/material/Tooltip';
+import { visuallyHidden } from '@mui/utils';
 import { USERS_COLUMNS } from '../constants/usersColumns';
 import type { User } from '../model/types';
 
 type UsersTableRowProps = {
   user: User;
+  /** Renamed on this device, so the name shown is not the one the API returned. */
+  isEdited: boolean;
   onOpen: (id: number) => void;
 };
 
 const rowHeaderSx = { fontWeight: 'medium' } as const;
+
+/*
+ * A dot rather than a chip or the word "edited". Every cell on this row is one line with
+ * the overflow clipped, so anything wider is taken out of the name it is describing. The
+ * tooltip carries the meaning for a mouse, and the hidden text carries it for a screen
+ * reader, which is the pair a bare dot needs to not be decoration.
+ */
+const markerSx = {
+  display: 'inline-block',
+  width: 6,
+  height: 6,
+  mr: 1,
+  borderRadius: '50%',
+  bgcolor: 'primary.main',
+  verticalAlign: 'middle',
+} as const;
 const actionCellSx = { textAlign: 'right', py: 0 } as const;
 
 /**
@@ -20,6 +41,7 @@ const actionCellSx = { textAlign: 'right', py: 0 } as const;
  */
 export const UsersTableRow = memo(function UsersTableRow({
   user,
+  isEdited,
   onOpen,
 }: UsersTableRowProps) {
   return (
@@ -55,6 +77,16 @@ export const UsersTableRow = memo(function UsersTableRow({
 
         return column.isRowHeader === true ? (
           <TableCell key={column.id} component="th" scope="row" sx={rowHeaderSx}>
+            {isEdited && (
+              <>
+                <Tooltip title="Renamed on this device">
+                  <Box component="span" sx={markerSx} />
+                </Tooltip>
+                <Box component="span" sx={visuallyHidden}>
+                  Renamed on this device:
+                </Box>
+              </>
+            )}
             {column.value(user)}
           </TableCell>
         ) : (

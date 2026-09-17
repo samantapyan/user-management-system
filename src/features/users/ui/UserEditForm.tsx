@@ -1,0 +1,99 @@
+import { useEffect } from 'react';
+import { zodResolver } from '@hookform/resolvers/zod';
+import { useForm } from 'react-hook-form';
+import Box from '@mui/material/Box';
+import Button from '@mui/material/Button';
+import TextField from '@mui/material/TextField';
+import { userEditFormSchema, type UserEditFormValues } from '../model/schemas';
+import type { User } from '../model/types';
+import { saveUserName } from '../model/userEdits';
+
+type UserEditFormProps = {
+  user: User;
+  /** `persisted` is false when the browser accepted the change but would not store it. */
+  onSaved: (persisted: boolean) => void;
+  onCancel: () => void;
+  /** So the dialog can ask before throwing away something half typed. */
+  onDirtyChange: (isDirty: boolean) => void;
+};
+
+/** Sits where the heading was, so the field appears over the name it is replacing. */
+const formSx = {
+  display: 'flex',
+  alignItems: 'flex-start',
+  flexWrap: 'wrap',
+  gap: 1,
+  width: '100%',
+};
+const fieldSx = { flex: '1 1 200px' };
+
+/**
+ * Renaming one user, in place of the dialog's heading.
+ *
+ * The rules are not in the brief, so they are in `userEditFormSchema` and nowhere else:
+ * the same schema decides whether Save is enabled, what the message under the field says,
+ * and what value is written. Validating in the component instead would be three places
+ * that have to agree, and they eventually do not.
+ *
+ * `mode: 'onChange'` because Save is disabled while the value is invalid. A button that
+ * is disabled until you submit once, with no visible reason, is a dead end.
+ */
+export function UserEditForm({
+  user,
+  onSaved,
+  onCancel,
+  onDirtyChange,
+}: UserEditFormProps) {
+  const {
+    register,
+    handleSubmit,
+    formState: { errors, isDirty, isValid },
+  } = useForm<UserEditFormValues>({
+    resolver: zodResolver(userEditFormSchema),
+    defaultValues: { name: user.name },
+    mode: 'onChange',
+  });
+
+  useEffect(() => {
+    onDirtyChange(isDirty);
+  }, [isDirty, onDirtyChange]);
+
+  return (
+    <Box
+      component="form"
+      noValidate
+      sx={formSx}
+      onSubmit={(event) => {
+        void handleSubmit((values) => {
+          onSaved(saveUserName(user.id, values.name));
+        })(event);
+      }}
+    >
+      <TextField
+        {...register('name')}
+        label="Name"
+        size="small"
+        autoFocus
+        sx={fieldSx}
+        error={errors.name !== undefined}
+        // A space rather than nothing, so the row does not change height the moment the
+        // message appears and push the details below it.
+        helperText={errors.name?.message ?? ' '}
+      />
+
+      <Button size="small" onClick={onCancel}>
+        Cancel
+      </Button>
+      {/* Disabled while unchanged too: saving the name it already has would mark the user
+          as locally edited for no reason, and that marker means something. */}
+      <Button
+        size="small"
+        type="submit"
+        variant="contained"
+        disabled={!isValid || !isDirty}
+      >
+        Save
+      </Button>
+    </Box>
+  );
+}
