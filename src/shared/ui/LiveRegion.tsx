@@ -1,4 +1,5 @@
 import Box from '@mui/material/Box';
+import { visuallyHidden } from '@mui/utils';
 
 type LiveRegionProps = {
   message: string;
@@ -13,18 +14,7 @@ type LiveRegionProps = {
  */
 export function LiveRegion({ message }: LiveRegionProps) {
   return (
-    <Box
-      role="status"
-      aria-live="polite"
-      sx={{
-        position: 'absolute',
-        width: '1px',
-        height: '1px',
-        overflow: 'hidden',
-        clipPath: 'inset(50%)',
-        whiteSpace: 'nowrap',
-      }}
-    >
+    <Box role="status" aria-live="polite" sx={visuallyHidden}>
       {message}
     </Box>
   );

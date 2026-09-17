@@ -3,9 +3,11 @@ import Paper from '@mui/material/Paper';
 import { StatusBlock } from '@/shared/ui/StatusBlock';
 import { useCitiesQuery } from '../api/useCitiesQuery';
 import { useUsersQuery } from '../api/useUsersQuery';
+import { useOpenUser } from '../model/useOpenUser';
 import { useUsersParams } from '../model/useUsersParams';
 import { DEFAULT_QUERY } from '../model/usersParams';
 import { resolveUsersViewState } from '../model/usersViewState';
+import { UserDetailDialog } from './UserDetailDialog';
 import { UsersFilters } from './UsersFilters';
 import { UsersTable } from './UsersTable';
 
@@ -21,8 +23,17 @@ export function UsersScreen() {
   const { query, setQuery } = useUsersParams();
   const usersQuery = useUsersQuery(query);
   const citiesQuery = useCitiesQuery();
+  const { openUserId, openUser, closeUser } = useOpenUser();
 
   const state = resolveUsersViewState(usersQuery, query);
+
+  /* The row the user clicked, when the open user is on the page in front of them. It
+     saves the dialog showing a spinner over data already on screen, and it is absent
+     when somebody arrives on a shared link, which is exactly when a load is expected. */
+  const openedFromRow =
+    state.status === 'ready' && openUserId !== null
+      ? state.users.find((user) => user.id === openUserId)
+      : undefined;
   const retry = () => void usersQuery.refetch();
   const clearFilters = () => setQuery({ search: DEFAULT_QUERY.search, city: null });
 
@@ -60,6 +71,15 @@ export function UsersScreen() {
           onQueryChange={setQuery}
           onClearFilters={clearFilters}
           onRetry={retry}
+          onOpenUser={openUser}
+        />
+      )}
+
+      {openUserId !== null && (
+        <UserDetailDialog
+          userId={openUserId}
+          fromRow={openedFromRow}
+          onClose={closeUser}
         />
       )}
     </>

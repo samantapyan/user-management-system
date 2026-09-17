@@ -48,3 +48,16 @@ export async function listUsers(
 export async function listCities(signal?: AbortSignal): Promise<string[]> {
   return distinctCities(await fetchAllUsers(signal));
 }
+
+/**
+ * One user. Today it filters the same full fetch; a real backend answers this from
+ * `/users/:id`, and only this function changes.
+ *
+ * Returns null rather than throwing when there is no such user. A link to a user who has
+ * been deleted is an ordinary thing to happen, not a failure of the request, and the two
+ * deserve different messages on screen.
+ */
+export async function getUser(id: number, signal?: AbortSignal): Promise<User | null> {
+  const users = await fetchAllUsers(signal);
+  return users.find((user) => user.id === id) ?? null;
+}

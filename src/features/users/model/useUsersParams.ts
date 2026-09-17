@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
-import { useSearchParams } from 'react-router';
+import { useUrlParams } from '@/shared/lib/useUrlParams';
 import type { UsersQuery } from './types';
 import { DEFAULT_QUERY, parseUsersQuery, usersQueryToParams } from './usersParams';
 
@@ -32,43 +32,44 @@ function historyModeFor(
 
 /** The view lives in the URL, so a reload, the back button and a shared link all work. */
 export function useUsersParams() {
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams, setSearchParams] = useUrlParams();
 
   // `searchParams` is a new object every render, and the parsed query is the cache key,
   // so without memoising it every render would look like a different view.
   const query = useMemo(() => parseUsersQuery(searchParams), [searchParams]);
 
-  /* Both values `setQuery` needs change on every navigation: the query itself, and
-     react-router's `setSearchParams`, which is a new function each time the location
-     changes. Closing over either one would make `setQuery` a new function after every
-     change, which re-runs consumers' effects and defeats any memo below it. Measured
-     before this: a sort click re-rendered the filters because their `onQueryChange` prop
-     had a new identity, even though nothing they display had changed.
-
-     Read through a ref, `setQuery` is stable for the life of the component. */
-  const latest = useRef({ query, setSearchParams });
+  /* `historyModeFor` needs the query as it is now, and closing over it would give
+     `setQuery` a new identity after every change. Consumers hold it in dependency arrays
+     and pass it down as a prop, so that re-runs their effects and defeats their memo.
+     Measured before this was fixed: a sort click re-rendered the filters over a prop
+     identity for data they do not display. The writer itself is already stable, from
+     useUrlParams. */
+  const queryRef = useRef(query);
   useEffect(() => {
-    latest.current = { query, setSearchParams };
-  });
+    queryRef.current = query;
+  }, [query]);
 
-  const setQuery = useCallback((patch: Partial<UsersQuery>) => {
-    const { query: current, setSearchParams: write } = latest.current;
+  const setQuery = useCallback(
+    (patch: Partial<UsersQuery>) => {
+      setSearchParams(
+        (params) => {
+          const next = { ...parseUsersQuery(params), ...patch };
 
-    write(
-      (params) => {
-        const next = { ...parseUsersQuery(params), ...patch };
+          // Otherwise a search that now matches four rows leaves the user on page three
+          // looking at an empty table. A patch that sets `page` itself wins.
+          if (!('page' in patch)) {
+            next.page = DEFAULT_QUERY.page;
+          }
 
-        // Otherwise a search that now matches four rows leaves the user on page three
-        // looking at an empty table. A patch that sets `page` itself wins.
-        if (!('page' in patch)) {
-          next.page = DEFAULT_QUERY.page;
-        }
-
-        return usersQueryToParams(next);
-      },
-      historyModeFor(patch, current),
-    );
-  }, []);
+          // `params` is carried through, so anything this query does not own, such as an
+          // open user, survives a filter change.
+          return usersQueryToParams(next, params);
+        },
+        historyModeFor(patch, queryRef.current),
+      );
+    },
+    [setSearchParams],
+  );
 
   return { query, setQuery };
 }

@@ -4,6 +4,7 @@ import {
   PAGE_SIZE_OPTIONS,
   type PageSize,
 } from '../constants/pagination';
+import { URL_PARAM } from '../constants/urlParams';
 import type { UsersQuery } from './types';
 
 /** URL to query and back. Pure, so it is testable without rendering anything. */
@@ -15,15 +16,6 @@ export const DEFAULT_QUERY: UsersQuery = {
   page: 1,
   pageSize: DEFAULT_PAGE_SIZE,
 };
-
-// These stop being a detail the moment somebody bookmarks one, so they live in one place.
-const PARAM = {
-  search: 'q',
-  city: 'city',
-  sort: 'sort',
-  page: 'page',
-  pageSize: 'size',
-} as const;
 
 // A URL is user input: `?page=abc` and an outdated bookmark must not reach the data
 // layer or break the screen, so every field falls back rather than throwing.
@@ -41,38 +33,58 @@ export function toPageSize(value: unknown): PageSize {
 }
 
 export function parseUsersQuery(params: URLSearchParams): UsersQuery {
-  const city = params.get(PARAM.city);
+  const city = params.get(URL_PARAM.city);
 
   return {
-    search: params.get(PARAM.search) ?? DEFAULT_QUERY.search,
+    search: params.get(URL_PARAM.search) ?? DEFAULT_QUERY.search,
     city: city === null || city === '' ? null : city,
-    sort: sortSchema.parse(params.get(PARAM.sort)),
-    page: pageSchema.parse(params.get(PARAM.page)),
-    pageSize: toPageSize(params.get(PARAM.pageSize)),
+    sort: sortSchema.parse(params.get(URL_PARAM.sort)),
+    page: pageSchema.parse(params.get(URL_PARAM.page)),
+    pageSize: toPageSize(params.get(URL_PARAM.pageSize)),
   };
 }
 
-/** Anything at its default is left out, so a first load is a bare path. */
-export function usersQueryToParams(query: UsersQuery): URLSearchParams {
-  const params = new URLSearchParams();
+/**
+ * Anything at its default is removed, so a first load is a bare path.
+ *
+ * `existing` is carried through rather than replaced. This function owns five parameters
+ * and must not discard the rest: building a fresh URLSearchParams means that opening a
+ * user and then sorting drops `?user=` and closes the dialog, and every parameter added
+ * later walks into the same trap.
+ */
+export function usersQueryToParams(
+  query: UsersQuery,
+  existing?: URLSearchParams,
+): URLSearchParams {
+  const params = new URLSearchParams(existing);
 
-  if (query.search.trim() !== '') {
-    params.set(PARAM.search, query.search);
-  }
-  if (query.city !== null) {
-    params.set(PARAM.city, query.city);
-  }
-  if (query.sort !== DEFAULT_QUERY.sort) {
-    params.set(PARAM.sort, query.sort);
-  }
-  if (query.page !== DEFAULT_QUERY.page) {
-    params.set(PARAM.page, String(query.page));
-  }
-  if (query.pageSize !== DEFAULT_QUERY.pageSize) {
-    params.set(PARAM.pageSize, String(query.pageSize));
-  }
+  setOrDelete(params, URL_PARAM.search, query.search.trim() === '' ? null : query.search);
+  setOrDelete(params, URL_PARAM.city, query.city);
+  setOrDelete(
+    params,
+    URL_PARAM.sort,
+    query.sort === DEFAULT_QUERY.sort ? null : query.sort,
+  );
+  setOrDelete(
+    params,
+    URL_PARAM.page,
+    query.page === DEFAULT_QUERY.page ? null : String(query.page),
+  );
+  setOrDelete(
+    params,
+    URL_PARAM.pageSize,
+    query.pageSize === DEFAULT_QUERY.pageSize ? null : String(query.pageSize),
+  );
 
   return params;
+}
+
+function setOrDelete(params: URLSearchParams, key: string, value: string | null): void {
+  if (value === null) {
+    params.delete(key);
+  } else {
+    params.set(key, value);
+  }
 }
 
 /** True when anything is narrowing the list, which decides which empty state to show. */
