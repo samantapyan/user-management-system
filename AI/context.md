@@ -1,8 +1,8 @@
 # Working in this repo
 
 The brief for anyone about to change code in this repo. It is written to be used, not
-read. If you read only two sections, read "Rules that are not negotiable" and "Things
-that look like help and are damage".
+read. If you read only two sections, read "Rules that are not negotiable" and "Traps
+this codebase has already sprung".
 
 It describes the shape the code is being built into, so where something does not exist
 yet, it says so.
@@ -61,6 +61,53 @@ A green Lighthouse is a floor, not a pass. It reported accessibility 100 while t
 header had no visible focus ring at all, because it cannot tell whether a focus style is
 actually visible. Tab through the screen yourself and look at where focus lands.
 
+**There is no test runner in this repository.** No Vitest, no test files, nothing behind
+`npm test`. That is a known gap, written up in the README, and not an invitation to skip
+checking. Behaviour is verified by calling the real modules and asserting on what they
+return, and by driving the built app in a browser. If you touch `model/` or `api/`, write
+assertions against the real functions and run them before you claim it works. `model/` is
+free of React and of the DOM precisely so that this costs you nothing.
+
+If you build such a script outside `src/`, nothing typechecks it. Rebuild it from source
+every time you run it. A stale build of one reported green for a whole session here while
+it was calling a function whose signature had changed underneath it.
+
+A script that only touches `model/` runs under `npx tsx` as it is. One that reaches `api/`
+does not, because that pulls in `shared/config.ts`, which reads `import.meta.env`, and
+`tsx` does not define it. Bundle those first, which also gives you the alias:
+
+```bash
+npx esbuild script.ts --bundle --format=esm --platform=node --target=node20   --define:import.meta.env="{}" --alias:@=./src --outfile=script.mjs && node script.mjs
+```
+
+For accessibility, a score is not a check. Load axe-core against the running preview and
+run it in every state your change can reach, not only the first paint:
+
+```js
+const src = await fetch(
+  'https://cdnjs.cloudflare.com/ajax/libs/axe-core/4.10.2/axe.min.js',
+).then((r) => r.text());
+document.head.appendChild(
+  Object.assign(document.createElement('script'), { textContent: src }),
+);
+await axe.run(document, {
+  runOnly: { type: 'tag', values: ['wcag2a', 'wcag2aa', 'wcag21a', 'wcag21aa'] },
+});
+```
+
+That currently reports zero violations across the list, the dialog, the edit form and the
+form in its invalid state. Read its `incomplete` results as well and settle them by hand:
+both of the ones reported here are false positives, and proving that took measuring the
+contrast manually and tabbing to confirm the dialog traps focus.
+
+**Finished means all of these, not the first one.** `npm run verify` exits 0. `npm run
+build` exits 0. The behaviour you changed is exercised in a browser. Nothing that used to
+work has stopped.
+
+**Measure, do not estimate.** Every number in the README was measured: bundle size before
+and after a dependency, requests per action, layout shift compared against the build from
+before the change. One of them stayed wrong until it was measured a second time.
+
 ## Where code lives
 
 ```
@@ -86,6 +133,23 @@ src/
     ui/                 components more than one feature would need
     lib/                helpers more than one feature would need
 ```
+
+The files you are most likely to need, and what each one owns:
+
+| File                        | Owns                                                              |
+| --------------------------- | ----------------------------------------------------------------- |
+| `api/usersApi.ts`           | the only place the query work and the edit overlay are applied    |
+| `api/usersKeys.ts`          | every cache key, built from one root                              |
+| `model/queryUsers.ts`       | search, city filter, sort, paging: the work a server would do     |
+| `model/applyEdits.ts`       | merging local renames, and the order that has to happen in        |
+| `model/userEdits.ts`        | the rename store, `localStorage` backed                           |
+| `model/usersParams.ts`      | URL to typed query and back                                       |
+| `model/useUsersParams.ts`   | which changes get a history entry                                 |
+| `model/usersViewState.ts`   | which one state the screen is in                                  |
+| `model/schemas.ts`          | every zod schema: the API shape, the stored edits, the form rules |
+| `constants/usersColumns.ts` | the table's columns, declared once                                |
+| `shared/lib/http.ts`        | the only `fetch`, with the timeout and the error normalising      |
+| `shared/lib/storage.ts`     | versioned, validated `localStorage`                               |
 
 **Grouped by feature, not by file type.** A top level `components/`, `hooks/`, `utils/`
 works for five files and stops working somewhere around thirty screens, because from then
@@ -129,15 +193,23 @@ depends on it. Adding the keyword later costs one keystroke. If a helper can onl
 tested by exporting it, test it through whatever does use it instead, or give it its own
 module with a real surface. `index.ts` is the same rule one level up.
 
-**7. The table's columns are defined once, in `constants/usersColumns.ts`.** Adding a
-column is one entry in that array and nothing else. Sorting is the exception: `UsersQuery`
-carries a direction and no field, so exactly one column can be sortable and it is named by
-`SORTABLE_COLUMN_ID`. Making a second column sortable means adding `sortBy` to
-`UsersQuery` first. If you find yourself editing the header, the row
-component and a skeleton to add one column, stop: that is the bug this file was created to
-remove, and a mismatch between them is only visible while data is loading, which is when
-nobody is looking. The same applies to anything else that would otherwise be declared in
-two places.
+**7. The table's columns are defined once, in `constants/usersColumns.ts`.** The header,
+the body and the loading skeleton all read that array, so adding a column is one entry
+there. If you find yourself editing the header, the row component and a skeleton to add one
+column, stop: that is the bug this rule exists to prevent, and a mismatch between them only
+shows while data is loading, which is when nobody is looking.
+
+Two things come with that entry. The widths are binding, because the table is
+`table-layout: fixed`: the four data columns are percentages that currently come to 90 and
+the actions column is a fixed `64px`, so a new column means rebalancing the rest rather
+than appending a width and hoping. And `value` returns a string on purpose, because a
+config that can render arbitrary elements stops being configuration and becomes a
+framework; if one column genuinely needs a link or a chip, give the type an optional
+`render` for that column rather than turning every column into JSX.
+
+Sorting is the exception to "one entry". `UsersQuery` carries a direction and no field, so
+exactly one column can be sortable and it is named by `SORTABLE_COLUMN_ID`. Making a second
+column sortable means adding `sortBy` to `UsersQuery` first.
 
 ## Code conventions
 
@@ -155,6 +227,12 @@ compiler that is correct is the worst change you can make in this repo.
 unless it starts with an underscore. If you genuinely need an escape hatch, use
 `@ts-expect-error` with a sentence above it saying why, so the next person can judge it.
 
+**`exactOptionalPropertyTypes` changes how an optional prop is passed.** `{ cause: undefined }`
+is not the same as passing nothing, so an optional value is spread in rather than set to
+undefined: `...(placeholder === undefined ? {} : { placeholderData: placeholder })`. You
+will meet this the first time you forward something optional, in `useUserQuery` and in
+`shared/lib/http.ts`.
+
 **Comments are rare and load bearing.** Keep one only if deleting it would let a competent
 developer confidently make a wrong change: a trap, a constraint that is not visible in the
 code, or a line that looks wrong and is right. Why a library or an approach was chosen goes
@@ -171,9 +249,13 @@ design system on top of MUI, stop.
 
 ## Things that look like help and are damage
 
-- **Adding a dependency.** The runtime install is React, React DOM, MUI, emotion, React
-  Router, TanStack Query and zod, and each one is argued for in the README. Adding a
-  library to solve something small is a cost the next person pays. Ask first.
+- **Adding a dependency.** The runtime install is React, React DOM, MUI, emotion,
+  `@mui/utils`, React Router, TanStack Query, zod, React Hook Form and its zod resolver.
+  Each one is argued for in the README. Check that list before you reach outside it: a form
+  uses React Hook Form with `zodResolver` and a schema from `model/schemas.ts`, which is
+  what makes one object decide whether the submit button is enabled, what the message under
+  the field says, and what value is written. Adding a library to solve something small is a
+  cost the next person pays. Ask first.
 - **Adding a backend, authentication, or real persistence.** All explicitly out of scope.
 - **Writing a URL or any other per-environment value as a literal.** It goes in
   `shared/config.ts`, read from `import.meta.env`, with the current value as the fallback.
@@ -197,6 +279,14 @@ design system on top of MUI, stop.
   found.
 - **Writing a test that renders a component and asserts nothing.** It is worse than no test
   at all, because it reports green while checking nothing.
+- **Writing a helper the library already ships.** `visuallyHidden` was hand rolled here
+  until somebody noticed `@mui/utils` exports it, with the `margin: -1px` and `border: 0`
+  the copy had missed. Search the installed packages before adding a util, and if you do
+  import from one that arrived as a transitive dependency, declare it in `package.json`
+  rather than relying on another package to keep pulling it in.
+- **Putting something in `shared/ui/` that is not a component.** It holds components. A
+  style constant among them makes the folder mean two things, and the `.ts` among the
+  `.tsx` files is the tell.
 - **Making one large commit at the end.** See below.
 
 ## Commits
@@ -229,6 +319,13 @@ cache entry and physically cannot overwrite a newer one. The signal only saves w
 the state would still be correct without it. Narrowing the key to "search" or "page"
 reintroduces the race, and it will not show up on a fixture that answers in 30ms.
 
+**Something belongs in a query key only if it changes the answer.** The local edit overlay
+is in the list's key, because search and sort run over renamed values, so a different
+overlay really is a different page of results. It was also in the detail's key, where it
+changes nothing, and that made one local rename cost three network requests instead of one.
+For the detail the overlay is applied in `select`, after the cache rather than inside its
+identity.
+
 **`getSnapshot` must return the same reference until the value really changes.**
 `model/userEdits.ts` keeps the parsed overlay in a module variable. Reading `localStorage`
 inside the getter hands back a new object every call, which `useSyncExternalStore` reads as
@@ -249,6 +346,36 @@ outline bug the theme fixes: `MuiButtonBase` sets `outline: 0` at the same speci
 global focus rule and is injected after it. Neither is caught by a score; both were caught
 by tabbing through and reading computed styles.
 
-**A percentage width on a column that holds a control.** The table is `table-layout: fixed`
-and the actions column is `64px`, not a share of the table, because a share shrinks below
-the button it exists to hold.
+**Changing the shape of anything stored is a migration, not an edit.**
+`shared/lib/storage.ts` wraps the value as `{ v, data }` and returns the fallback whenever
+`v` does not match or the schema rejects what it finds. The schema validates the whole
+record at once and the fallback is the whole store, so adding a required field to
+`UserEdit` discards every rename already on disk, on every machine, whether or not you bump
+the version. Add new fields as optional, or bump the version deliberately and say in the
+commit message that saved edits are being dropped.
+
+**MUI containers scroll on both axes.** `TableContainer` and `TablePagination` default to
+`overflow: auto`, which wraps a box whose height is always exactly its content in a second
+vertical scrollbar inside the page's own. The table container is `overflowX: 'auto'` with
+`overflowY: 'hidden'`, because sideways is the one direction it really does need. The
+pagination is `overflow: 'hidden'`, because it wraps instead and never needs to scroll at
+all. On the axis you are switching off write `hidden`, not `visible`: CSS computes an axis
+set to `visible` back to `auto` when the other one scrolls, so `visible` hands you straight
+back the thing you were removing.
+
+**An absolutely positioned element escapes the box you think it is in.** The visually
+hidden "Actions" label in the table header had no positioned ancestor, so its containing
+block was the page. The scroller could not clip it, the document grew sideways to reach
+its static position at roughly 610px, and a phone got a page level horizontal scrollbar
+next to the table's own. The element is one pixel wide and clipped, so nothing looked
+wrong and a scan for elements sticking out past the viewport found nothing. The scroll
+container carries `position: relative` for exactly this.
+
+**A table sizes to its content unless you tell it not to.** On the default `table-layout`
+this one sized to its longest cell, 752px, whatever the window was doing, so the sideways
+scrollbar turned up at widths with room to spare. It is `table-layout: fixed`, which makes
+the declared column widths binding, with `text-overflow: ellipsis`, because a column that
+cannot grow has to be allowed to clip.
+
+**A percentage width on a column that holds a control.** The actions column is `64px`, not
+a share of the table, because a share shrinks below the button it exists to hold.

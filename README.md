@@ -7,13 +7,20 @@ rename them so the change survives a reload.
 
 ---
 
-## Status
+## Where each answer is
 
-The decisions below are decided. Where something is not implemented yet, it says so.
-
-Every section the task asks for is present. **What is still wrong with this** grows as the
-code does rather than being collected at the end, and **Accessibility, devices and settings**
-lists only what was actually checked, with what was not checked said out loud.
+| The task asks for                                | Section                             |
+| ------------------------------------------------ | ----------------------------------- |
+| The level I am applying for                      | top of this file                    |
+| How to run it                                    | Running it                          |
+| Which component or styling library, and why      | The stack, and why                  |
+| Edited users against fresh server data, and why  | Gap 2                               |
+| Devices, input methods and settings checked, how | Accessibility, devices and settings |
+| Gaps and contradictions in the requirements      | Gaps and contradictions             |
+| Assumptions made instead of asking               | Assumptions                         |
+| What is missing, and why                         | Tests                               |
+| What is still wrong with this                    | its own section                     |
+| What I would need before building this for real  | its own section                     |
 
 ## Running it
 
@@ -61,14 +68,13 @@ end means fixing every error at once, by which point the workarounds are already
 and the flags just get switched back off. ESLint also makes `any` and non-null assertions
 errors, so the ways out of the type system have to be argued for rather than used quietly.
 
-**Vite, not Next.js.** The browser cannot run TypeScript or JSX, so a build step was never
-optional. The real question was Vite against a framework. Next.js earns its cost when you
-need the server: server rendering, server components, image optimisation, file based
-routing. This app has no backend, one screen, and nothing to index. Every hard requirement
-here is a client concern: state in the URL, the back button, local storage, a stale
-response never overwriting a newer one. Server components cannot touch `localStorage`, so I
-would mark almost everything as a client component and pay for a tool I had just switched
-off. Vite builds to static files, which matches a task where a backend is out of scope.
+**Vite, not Next.js.** A build step was never optional; the question was Vite against a
+framework. Next.js earns its cost when you need the server: rendering, server components,
+image optimisation, file based routing. This app has no backend, one screen and nothing to
+index, and every hard requirement is a client concern: URL state, the back button,
+`localStorage`, a stale response never overwriting a newer one. Server components cannot
+touch `localStorage`, so almost everything would be a client component and I would be
+paying for a tool I had just switched off.
 
 **MUI, used as it comes.** No design was provided, so I took a library that already has a
 finished visual language and, more importantly, accessible dialogs, selects, focus handling
@@ -77,13 +83,12 @@ on rebuilding a focus trap. The task puts a design system out of scope, so I set
 and stop there. Emotion is not a separate choice, it is the engine MUI renders through, and
 the build fails without it.
 
-The theme is small but not empty, and it carries three things a user cannot ask for through
-the interface: reduced motion is respected, controls are at least 44px on a touch screen,
-and the focus ring is visible on both colour schemes. Light and dark run on CSS media
-queries with no JavaScript, so there is no flash of the wrong scheme on first paint. The
-font is the system stack rather than a downloaded one, which saves around 70kB and a flash
-of fallback text, and it moves the screen away from looking like a stock Material demo,
-which is the main risk of taking a component library.
+The theme is small but not empty. It carries three things a user cannot ask for through the
+interface: reduced motion respected, touch targets of at least 44px, and a focus ring
+visible on both colour schemes. Light and dark are CSS media queries with no JavaScript, so
+there is no flash of the wrong one. The font is the system stack, which saves about 70kB
+and a flash of fallback text, and moves the screen away from looking like a stock Material
+demo, the main risk of taking a component library.
 
 **What I would choose instead, if the question changed.** If a design existed, MUI would
 become a cost rather than a benefit, because I would spend the day overriding its defaults.
@@ -97,13 +102,15 @@ cache with a request lifecycle attached, and the lifecycle is the part I wanted.
 `useEffect` and `useState` mean hand writing loading, error, retry, cancellation,
 deduplication and staleness for every call, and getting one of them subtly wrong per screen.
 
-The reason it is here rather than any of its alternatives is narrower than that. The
-requirement that a stale response must never overwrite a newer one is answered by the cache
-key. The whole query object is the key, so two views are two entries, and a slow answer for
-the older one cannot be written where the newer one lives. That is prevented by the shape of
-the cache, not by a check somebody remembers to write, so it holds for a race nobody
-predicted. `keepPreviousData` then gives paging that does not blank the table between pages,
-and the retry policy is where it is decided that a 404 is not worth asking again.
+The reason it is here rather than an alternative is narrower. A stale response must never
+overwrite a newer one, and the cache key answers that: the whole query object is the key,
+so two views are two entries and a late answer cannot land where the newer one lives. The
+shape of the cache prevents it, not a check somebody remembers to write, so it holds for a
+race nobody predicted. Against this fixture the race cannot occur at all, because ten rows
+and client side search mean no request per keystroke; it is handled because the code is
+written for the API it will meet. The abort signal cancels unwanted work, the key is what
+makes the answer correct. `keepPreviousData` stops the table blanking between pages, and
+the retry policy is where a 404 stops being worth asking twice.
 
 What I considered instead: SWR, which is smaller and would have done the caching, but has
 less around mutations and cancellation, and the mutation path is where the rename goes.
@@ -137,31 +144,29 @@ bundle, and writing it demonstrates knowing why the naive version breaks: `pushS
 `replaceState` do not fire `popstate`, so anything hand rolled has to notify its own
 subscribers.
 
-Three things decided it the other way. The requirement that unsaved changes in the rename
-form are not silently lost is close to unimplementable without a router. `popstate` fires
-**after** the navigation has happened, so a back press cannot be cancelled, only undone by
-shoving a state back onto the stack and hoping. `useBlocker` stops it properly, and it is why
-this goes in as `createBrowserRouter` rather than the simpler `BrowserRouter`. Second, this
-is a user management panel and it will grow a second screen, at which point the route table
-gains a line instead of the app gaining a router. And third, consistency: the data layer is
-already written for the API this will meet rather than the fixture it has, and building the
-navigation for only the screen that exists today would contradict that in the same codebase.
+Three things decided it the other way. An unsaved rename that is not silently lost is close
+to unimplementable without a router: `popstate` fires **after** the navigation, so a back
+press cannot be cancelled, only undone by pushing a state back and hoping. `useBlocker`
+stops it properly, which is why this is `createBrowserRouter` rather than `BrowserRouter`.
+Second, a user management panel will grow a second screen, and then the route table gains a
+line instead of the app gaining a router. Third, consistency: the data layer is already
+written for the API this will meet, and building navigation for only today's screen would
+contradict that in the same codebase.
 
-**React Hook Form, for one field.** One text input hardly needs a form library and I would
-not have added it for that alone. What it carries is the requirement that an unsaved rename
-is not silently lost, which needs a reliable answer to "has this been changed", and hand
-rolled dirty tracking is exactly the kind of thing that quietly rots. It also takes the zod
-schema directly, so one object decides whether Save is enabled, what the message under the
-field says, and what value is written. Uncontrolled by default, so typing does not re-render
-the dialog around it.
+**React Hook Form, for one field.** One text input hardly needs a form library. What it
+carries is the requirement that an unsaved rename is not silently lost, which needs a
+trustworthy answer to "has this changed", and hand rolled dirty tracking is exactly what
+rots quietly. It also takes the zod schema directly, so one object decides whether Save is
+enabled, what the message under the field says, and what value is written. Uncontrolled, so
+typing does not re-render the dialog around it.
 
 **localStorage, not IndexedDB.** The edits are a few hundred bytes, scoped to one person,
-and needed synchronously before the first paint. IndexedDB is asynchronous and is the right
-answer for offline support or thousands of cached records, and neither is asked for here.
-What localStorage does need is defending: it outlives deploys, so today's code reads what
-last month's code wrote, a user can edit it by hand, and the browser can refuse both reads
-and writes. So the stored value carries a version, what comes back is validated with zod
-before it is trusted, and a refused write is reported on screen rather than swallowed.
+and needed synchronously before first paint. IndexedDB is asynchronous and is the right
+answer for offline or thousands of cached records, neither of which is asked for. What
+localStorage needs is defending: it outlives deploys, so today's code reads what last
+month's wrote, a person can edit it by hand, and the browser can refuse both reads and
+writes. So the value carries a version, what comes back is validated with zod before it is
+trusted, and a refused write is reported on screen rather than swallowed.
 
 **What they cost.** Zod and TanStack Query together added 30kB raw and 9kB gzipped. React
 Router added 98kB raw and 31kB gzipped, which is the largest single cost in the project after
@@ -190,7 +195,7 @@ were planned the same way and never arrived; the tests section says what happene
 
 ## Gaps and contradictions in the requirements
 
-Eighteen places where the requirements are silent, or where two of them cannot both be true.
+Twelve places where the requirements are silent, or where two of them cannot both be true.
 Each one has the decision I made for it. Several are not free choices, and those say so.
 
 This is the first of three related sections, and they are deliberately not the same list. A
@@ -207,31 +212,32 @@ rules out routing beyond what this screen needs. A separate page and a modal are
 allowed. I chose a modal, and I keep the opened user in the URL as `?user=3`, so a reload
 reopens it, the back button closes it, and the link is still shareable.
 
-### 2. Rename a user so it survives a reload, with no write endpoint
+### 2. Rename a user with no write endpoint, and which data wins
 
 There is only a `GET`. The API is not read-only either, which is worse: it accepts `PATCH`,
-answers `200`, and persists nothing. So a naive implementation looks like it worked and the
-change is gone on the next reload, with no error anywhere to explain it.
+answers `200`, and persists nothing. A naive implementation looks like it worked, and the
+change is gone on the next reload with no error anywhere to explain it.
 
-The change can therefore only survive locally. Local edits go to `localStorage` and are
-reapplied on top of fresh API data after every fetch.
-
-### 3. Local edits versus fresh server data, with nothing saying which wins
-
-**Local edits win.** The user performed an explicit action and it should not be silently
-undone.
-
-I want to be honest that this is barely a choice. The requirements say nothing a user has
-done should disappear because they reloaded, and the API never persists anything. So
+So the change can only survive locally, and that settles the question the task asks
+separately. When a local edit and fresh server data disagree, **the local edit wins.** I
+want to be honest that this is barely a choice: the requirements say nothing a user has
+done should disappear because they reloaded, and the API never persists anything, so
 "server wins" would delete the edit on every single reload and break the other requirement.
-The missing write endpoint decides this, not me.
+The missing endpoint decides this, not me.
 
-Two things make the decision less lossy. I store only the fields that were changed, not a
-whole copy of the user, so every field I did not edit stays fresh from the API. And an
-edited row is marked in the interface and can be reverted, so the user is never stuck with
-a value they cannot undo.
+Two things make the decision less lossy. Only the fields that changed are stored, never a
+copy of the whole user, so every field that was not edited stays fresh from the API. And an
+edited row is marked in the interface and can be reverted, so nobody is stuck with a value
+they cannot undo.
 
-### 4. "Nothing a user has done should disappear" has no boundary
+Then there is the part nothing in the task mentions, which is the real trap in it: a
+renamed user has to stay findable. Search and sort have to use the new name, so local edits
+are merged into the data **before** filtering and sorting, never after. Apply them after and
+the row displays the new name, searching for that name finds nothing, and the sort order is
+built from a value nobody can see on screen. It is one line in the wrong place, and the bug
+it causes looks like three unrelated bugs.
+
+### 3. "Nothing a user has done should disappear" has no boundary
 
 The rename is clear, and there is a requirement that states it exactly. But does it also
 cover the search text, the sort order, the city filter, the current page? Nothing says.
@@ -241,15 +247,15 @@ I decided yes, and all of them live in the URL, so a reload gives back the same 
 I deliberately do **not** restore a half typed name that was never saved. Bringing back text
 a user abandoned is a bug, not a feature. An unsaved change gets a warning instead.
 
-The warning covers every way out of the dialog, because there is only one: the dialog is
-opened and closed by a URL parameter, so Escape, the backdrop, the Close button and the
-browser's back button are all the same navigation, and one `useBlocker` sees all four.
-Guarding the component's own close handler instead would have covered three of them and let
-the back button throw the edit away without a word. It does not cover a reload or closing
-the tab; that needs `beforeunload`, whose prompt the browser writes and the page cannot
-word, and I would rather leave it out and say so than ship a dialog I do not control.
+The warning covers every way out, because there is only one. The dialog is opened and
+closed by a URL parameter, so Escape, the backdrop, the Close button and the back button
+are all the same navigation and one `useBlocker` sees all four. Guarding the component's
+own close handler would have caught three and let the back button discard the edit without
+a word. It does not cover a reload or a closed tab: that needs `beforeunload`, whose prompt
+the browser writes and the page cannot word, so I left it out rather than ship a dialog I
+do not control.
 
-### 5. The back button, with no navigation model specified
+### 4. The back button, with no navigation model specified
 
 "The back button should do what a user expects it to" does not say what the navigation model
 is. With the modal, back closes the modal rather than leaving the screen.
@@ -281,7 +287,7 @@ The cost is that ten deliberate changes are ten back presses, and that is correc
 they were ten choices. Pushing on every keystroke would be the other failure, where leaving
 the page takes twenty.
 
-### 6. "Searchable by name or email" does not say how
+### 5. "Searchable by name or email" does not say how
 
 There is no search endpoint, so every part of this is mine to decide: exact or partial,
 case sensitive or not, prefix or substring, debounced or not, client or server.
@@ -290,7 +296,7 @@ I chose case-insensitive substring matching over name and email, on the client, 
 value debounced before it is written to the URL. The input itself is never debounced,
 because a laggy text field is worse than a slightly late URL.
 
-### 7. Ten rows that never fail, and also far more rows than ten
+### 6. Ten rows that never fail, and also far more rows than ten
 
 "It returns ten users instantly and never fails" and "when there are far more rows than ten"
 cannot both describe the same API. Against this fixture there is no way to genuinely
@@ -331,6 +337,16 @@ left to sort.
 indistinguishable from the ten-row fixture. Above it, search, sort and paging have to move
 to the server, which is what the `{ items, total }` contract is for.
 
+That limit is also where the task contradicts itself hardest, because the other requirement
+is local edits. Past the same size the query work belongs on the server, and the server
+knows nothing about a local rename: renamed from "Zoe" to "Aaron", the row reads "Aaron",
+is still sorted and searched as "Zoe", and searching "Aaron" returns nothing. The client
+cannot repair it, because it only ever sees one page. Local edits are correct only while
+the whole dataset is on the client, and that is viable to about ten thousand rows. The same
+number, so ten thousand is where this design stops working, not where it starts to feel
+slow. I would rather name the limit than ship something that breaks quietly at the size the
+task asks me to build for.
+
 There is an optimisation available and I deliberately did not take it. Sorting once per
 direction and caching it, then filtering the sorted array, would turn 214ms per query into
 214ms once and about 30ms after, because filtering preserves order. It would also add a
@@ -338,7 +354,7 @@ module-level cache with identity-based invalidation to a pure module, to speed u
 architecture already says belongs on the server. Making the wrong answer survive longer is
 not an optimisation.
 
-### 8. "Never fails", and also "hold up when a request fails"
+### 7. "Never fails", and also "hold up when a request fails"
 
 The same paragraph says the API never fails and that the interface has to survive a request
 failing. I also do not accept "never fails" as true of anything: offline, DNS, CORS, a rate
@@ -350,18 +366,7 @@ and empty, and empty needs two versions: there is no data at all, and there is n
 the current filters. The second one offers a way to clear the filters, because otherwise the
 user is looking at an empty screen with no way out.
 
-### 9. The stale response race cannot happen against this API
-
-"Typing quickly must not let a stale response overwrite a newer one" is a real concern and a
-good thing to ask about. But with ten rows and client side search there is no request per
-keystroke, so against this fixture the race cannot occur at all.
-
-I handle it anyway, because the code is written for the API this will meet. The full query
-object is part of the query key, so a late answer belongs to a different cache entry and can
-never land on top of the current one, and the abort signal cancels the request that is no
-longer wanted. The key is what makes it correct. The abort signal is an optimisation.
-
-### 10. Filter by city, with no type specified
+### 8. Filter by city, with no type specified
 
 Dropdown, autocomplete, single or multiple selection, none of it is stated. I chose a single
 select dropdown, with the list of cities built from the loaded users.
@@ -371,7 +376,7 @@ on a server, the dropdown would show only the cities on the current page, which 
 a way that is hard to notice. At that point a real endpoint for the city list becomes
 necessary. Noting it here rather than discovering it later.
 
-### 11. "Responsive and usable" with no detail at all
+### 9. "Responsive and usable" with no detail at all
 
 Nothing is specified: breakpoints, tablet behaviour, keyboard support, screen readers,
 reduced motion, contrast, touch target size, browser support. This is a deliberate gap.
@@ -381,7 +386,13 @@ and `prefers-color-scheme` are respected, and there is a keyboard-only pass over
 screen. What I actually checked, and how, is in its own section below, and it lists only
 what I really did rather than what I assume works.
 
-### 12. Sort by name, but the data has two names
+One of those decisions has a visible cost. One long value used to widen its column and
+squeeze the others: measured with a 120 character name, the table went from 974px to 1663px
+and pushed Company off screen on every row. `table-layout: fixed` with `text-overflow:
+ellipsis` fixes that, and the price is that a long email is cut short at narrow widths and
+has to be read in the detail view.
+
+### 10. Sort by name, but the data has two names
 
 The API returns both `name` ("Leanne Graham") and `username` ("Bret"), and the requirement
 does not say which one to sort by. Nor does it say the default direction, or whether it
@@ -393,50 +404,7 @@ knowing before someone reports it as a bug. I use `Intl.Collator` rather than co
 `<`, because a plain comparison sorts anything non-ASCII wrongly, and user names are exactly
 the data where that happens.
 
-### 13. A renamed user has to stay findable, and nothing says so
-
-This is not written anywhere in the task and it is the real trap in it.
-
-If a user renames someone, search and sort have to use the new name. That means local edits
-must be merged into the data **before** filtering and sorting, not after. Apply them after
-and the row displays the new name, searching for that name finds nothing, and the sort order
-is built from a value nobody can see on screen.
-
-It is one line in the wrong place and the bug it causes looks like three unrelated bugs.
-
-### 14. The city filter is degenerate on this data
-
-I checked the actual response. Ten users, ten different cities, every city appears exactly
-once. So selecting a city always returns exactly one user, which makes the filter a slower
-way to do a search.
-
-I implemented it because it is required. But it is a data gap, and a filter that can only
-ever return one row is not a filter, so I would rather say that than present it as a working
-feature.
-
-### 15. Local edits and "far more rows than ten" cannot both be true
-
-This is the biggest contradiction in the task.
-
-I am asked to persist edits locally, and to build for a dataset much larger than ten. Past a
-certain size, search, sort and pagination have to move to the server. The server knows
-nothing about local edits.
-
-Concretely: a user renamed from "Zoe" to "Aaron" is still sorted and searched by the server
-as "Zoe". So the row shows "Aaron", sits at the end of the list, and searching for "Aaron"
-returns nothing. Nothing in the client can fix this, because the client only ever sees one
-page.
-
-Local edits are only correct while the entire dataset is on the client. Past that, the edit
-has to reach the server. I would rather name the limit than build something that quietly
-breaks at the size the task asks me to build for.
-
-The measurements in gap 7 put a number on it. The whole dataset stays viable on the client
-to roughly ten thousand rows, and local edits stay correct only while the whole dataset is
-on the client. Those are the same number, so ten thousand rows is where this design stops
-working, not where it starts to feel slow.
-
-### 16. No validation rules for the new name
+### 11. No validation rules for the new name
 
 Nothing says whether the name can be empty, whether spaces only counts, how long it may be,
 or whether duplicates are allowed.
@@ -444,16 +412,7 @@ or whether duplicates are allowed.
 I chose: trim the value, required, between 2 and 60 characters, duplicates allowed, and save
 disabled while invalid with the reason shown inline rather than after submitting.
 
-### 17. "User management screen" promises more than the requirements ask for
-
-User management normally means creating and deleting users and managing roles. Here only
-listing and renaming are asked for, and the scope section removes the backend,
-authentication and real persistence that the rest would need.
-
-So I kept it to reading and renaming. Where I stopped and why is in the scope section above,
-rather than left for the reader to work out whether I ran out of time or decided.
-
-### 18. Two tabs open at once
+### 12. Two tabs open at once
 
 Nothing says what should happen if the same user is edited in two tabs. Half of it is
 answered: the edit store listens for the browser's `storage` event, so a rename in one tab
@@ -465,12 +424,8 @@ in "What is still wrong with this", because I did not solve it rather than decid
 
 ## Assumptions
 
-Things I took as true without being told, and without asking. These are the ones not already
-covered by a gap above, so the two lists do not repeat each other. Each one would change work
-if it turned out to be wrong.
-
-This list grew during the work rather than being written once at the start. Anything near
-the end of it was added when I actually hit it.
+Things I took as true without being told and without asking, none of them already covered
+by a gap above. Each one would change work if it turned out to be wrong.
 
 **The fixture response shows the real shape of the data.** I rely on `id`, `name`, `email`,
 `address.city`, `company.name` and `phone` being present on every user. I validate the
@@ -546,6 +501,13 @@ The network is touched only in `api/`, so no component ever knows a URL. And `mo
 the logic with no JSX, which is exactly the part that is worth testing, because testing it
 does not need a rendered component.
 
+That shape costs requests against this fixture, and the number is worth stating rather than
+hiding. `listUsers` and `listCities` both want the whole dataset and stay separate calls,
+because a real backend answers them from separate endpoints: measured, two requests on
+first load, 36ms and 47ms. A rename costs one more, because the overlay is part of the
+list's cache key, which is what makes search and sort see the new name. Both disappear
+against an API that can answer a query and accept a write.
+
 What I deliberately did not do: the full Feature-Sliced Design layer stack, a monorepo, a
 generated API client, Storybook, or a barrel file in every folder. At one screen those are
 folders with one file in them, which is cost with no benefit. The generated client starts to
@@ -568,13 +530,11 @@ mobile               84           100            100        100
 ```
 
 Mobile performance is 84 because of script parse and execution on a throttled CPU, not
-because of anything on the screen. Largest Contentful Paint is 3.4s and Total Blocking Time
-is 280ms, and both are the cost of React, MUI and React Router being parsed before anything
-renders. It was 89 before the detail view and the rename, and the difference is the extra
-MUI components those needed, which is the same 20kB described in the stack section arriving
-in a different unit. That is the price of the library choices above, and the only real ways
-down from here are server rendering or fewer dependencies, both of which are decisions
-already made and explained.
+because of anything on the screen: LCP 3.4s, Total Blocking Time 280ms, both the cost of
+React, MUI and React Router being parsed before anything renders. It was 89 before the
+detail view and the rename, and the difference is the extra MUI components those needed,
+which is the 20kB from the stack section in a different unit. The only real ways down are
+server rendering or fewer dependencies, and both are decisions already made above.
 
 Layout shift is 0 on desktop and 0.021 on mobile, comfortably inside the 0.1 threshold. The
 mobile figure is the pagination row settling once the real row count replaces the loading
@@ -589,11 +549,11 @@ npx lighthouse http://localhost:4173 --view
 ```
 
 **Sizes**, in Chrome: 320, 375, 430, 1024 and 1280 wide. Below roughly 690px the table
-scrolls sideways inside its container rather than squeezing five columns into a phone, the
-page itself never scrolls sideways at any width, nothing on the page is a nested vertical
-scroller, and every row stays one line high. The detail view's heading holds the name and
-the edit control on one line and shortens the name, rather than dropping the control to a
-line of its own, which matters because a renamed user can be sixty characters long.
+scrolls sideways inside its container rather than squeezing five columns onto a phone. The
+page itself never scrolls sideways at any width, nothing is a nested vertical scroller, and
+every row stays one line high. The detail heading keeps the name and the edit control on
+one line and shortens the name instead, which matters because a renamed user can be sixty
+characters long.
 
 **Keyboard**, tabbing through the whole screen and recording where focus landed and what it
 looked like at each stop. Order is scroll region, then the sort header, then rows per page,
@@ -601,12 +561,11 @@ then the pagination buttons when they are enabled. The scrollable table is reach
 keyboard, which it is not by default: a container that scrolls but cannot be focused is
 unusable without a mouse.
 
-This is where the check earned its keep. MUI's `ButtonBase` sets `outline: 0` on its root,
-which has the same specificity as my global focus rule and is injected after it, so the sort
-header and the page size select had **no visible focus indicator at all**. Lighthouse scored
-accessibility 100 with that bug present, because it does not test whether a focus style is
-actually visible. It is fixed in the theme, and I only found it because I tabbed through and
-read the computed outline rather than trusting the score.
+This is where the check earned its keep. MUI's `ButtonBase` sets `outline: 0` at the same
+specificity as my global focus rule and is injected after it, so the sort header and the
+page size select had **no visible focus indicator at all**. Lighthouse scored accessibility
+100 with that present, because it cannot test whether a focus style is visible. Fixed in
+the theme, and found only by tabbing through and reading the computed outline.
 
 **The detail view and the rename form**, checked the same way. The dialog is named by its
 heading, the field is labelled, an invalid value sets `aria-invalid` with the reason tied to
@@ -674,116 +633,80 @@ mounts a component and asserts that it mounted. A deliberate skip is worth more 
 
 ## What is still wrong with this
 
-Written as problems are found rather than collected at the end. Two of them are already true
-from the decisions above, before any of the screen exists.
+Defects I know are in my own code and did not fix. Decisions and the costs they carry are
+in the gaps and the stack above; this list is only the things that are wrong.
 
-**Two tabs renaming at the same moment is last write wins.** A second tab does find out
-about a rename, because the edit store listens for the `storage` event. What it cannot do is
-survive a collision: if both tabs save a different name for the same user at the same time,
-one of the two is gone and neither tab says so. There is nothing to resolve the conflict
-against, because there is no server holding the real value. Nothing in the requirements says
-what should happen here, so this is one I have not solved rather than one I decided.
+**Two tabs renaming at once loses one of the names silently.** A second tab does learn
+about a rename, because the store listens for the `storage` event. What it cannot survive
+is a simultaneous collision: one name wins, the other is gone, and neither tab says so.
+There is no server holding the real value to resolve against, so this one is unsolved
+rather than decided.
 
-**The city filter only knows the cities it has already loaded.** The dropdown is built from
-the users currently in memory. That is correct while the whole dataset is on the client, and
-wrong the moment it is paginated on a server. The wrongness is quiet, which is the bad part:
-the filter simply stops offering cities that exist, and nothing looks broken.
+**The pagination row shifts once on mobile when the data lands.** Measured: 0.021 layout
+shift on mobile, 0 on desktop, against a threshold of 0.1. While the list is loading the
+count is zero, so the row reads "0-0 of 0" and wraps differently from "1-10 of 10".
+Reserving the height would fix it. I measured it against the previous build to be sure I
+had not caused it, found it was already there, and left it.
 
-**A truncated cell cannot be read without opening the row.** One long value used to widen
-its column and squeeze every other one: measured with a 120 character name, the table went
-from 974px to 1663px and pushed the Company column off screen on every row. That is fixed,
-with `table-layout: fixed` and `text-overflow: ellipsis`. The cost is the new problem: at
-narrow widths a long email or company is cut short, and the only way to see it in full is to
-open the detail view. A `title` on cells that actually overflow would fix it, and it needs
-measuring per cell to avoid a tooltip on text that is not truncated, so I have not done it.
+**The scrollable table region is a focus stop even when it does not scroll.** `tabIndex={0}`
+is right while the table is wider than its container and a stop that does nothing when it
+is not. Telling the two apart needs a `ResizeObserver`, which is more machinery than the
+problem is worth.
 
-**The users list is requested twice on first load.** `listUsers` and `listCities` both need
-the whole dataset, and they are separate calls because a real backend would answer them
-from separate endpoints, which is what makes that day a change to one module. Against this
-fixture it means two identical requests, usually served from the browser cache the second
-time. Measured: two requests, 36ms and 47ms.
-
-**Renaming re-runs the list query, request included.** The overlay is part of the list's
-query key, which is what makes search and sort see the new name, and it has the pleasant
-side effect that undoing a rename lands back on a result already in the cache. The cost is
-that a purely local change creates a new cache entry and a fetch, usually served from the
-browser cache. Measured: one request per rename. It was three until the detail query stopped
-carrying the overlay in its key, which bought nothing there, because a single user's detail
-does no searching or sorting. With a real write endpoint the rename becomes a mutation and
-the last one goes too.
-
-**The scrollable table region is always a tab stop.** It carries `tabIndex={0}` so keyboard
-users can scroll it, which is correct when it scrolls. On a desktop width it does not
-scroll, so it is a focus stop that does nothing. Doing this properly means measuring
-overflow with a `ResizeObserver`, which is more machinery than the problem deserves, so it
-stays as a known trade-off.
-
-More will be added here as the code is written, because that is when the rest of them appear.
+**And one that is not in the code: the checks are not in the repository.** 123 assertions
+ran against the real modules after every change and you can run none of them. The Tests
+section says what they cover.
 
 ## What I would need before building this for real
 
-The questions I would have asked a product owner, roughly in the order the answers would
-change the most work.
+The questions I would put to a product owner, roughly in the order the answers change the
+most work.
 
-**1. Who uses this screen, and what do they do with it every day?** A support agent looking
-up one person and an administrator working through the whole list want different layouts.
-Right now I am guessing about which fields matter and whether the id should be visible.
+**1. Who uses this every day, and for what?** A support agent looking up one person and an
+administrator working through the whole list want different layouts. I am guessing about
+which fields matter.
 
-**2. How many users are there in reality, hundreds or hundreds of thousands?** This decides
-client or server side filtering, pagination against virtualization, and whether local edits
-can work at all. See gap 15.
+**2. How many users really, hundreds or hundreds of thousands?** Decides client against
+server side filtering, pagination against virtualization, and whether local edits can work
+at all. See gap 6.
 
-**3. Who owns the visual language?** Is a design coming, is the look permanently my
-decision, and does a company design system already exist that I should be using? I would ask
-this first, because the answer flips the styling choice completely. With no design, a full
-component library like MUI is a benefit, because the visual decisions are already made. With
-a design, MUI becomes a cost because I would spend my time overriding it, and a headless
-library plus my own styling is right. With an existing company design system, neither
-applies and I use that.
+**3. Who owns the visual language?** I would ask this first, because it flips the styling
+choice outright. With no design a full component library is a benefit, because the visual
+decisions are already made. With a design MUI becomes a cost I spend the day overriding,
+and headless plus my own styling wins. With a company design system, neither applies.
 
-**4. Will edits go to a real API?** The whole local versus server decision changes the
-moment there is a write endpoint. Until then, local has to win, and that is the missing API
+**4. Will edits reach a real API?** The whole local against server decision changes the
+moment a write endpoint exists. Until then local has to win, and that is the missing API
 deciding rather than me.
 
-**5. What happens when two people edit the same user at the same time?** Last write wins or
-optimistic locking changes the data model and the error handling. And if the other person
-has to see the change live, that means a socket, which is a much larger scope than this
-screen.
+**5. What happens when two people edit the same user at once?** Last write wins or
+optimistic locking changes the data model and the error handling. If the other person has
+to see it live, that is a socket, and a far larger scope than this screen.
 
-**6. Is the name the only editable field, or the first of many?** A one field form and a ten
-field form are different things. If more are coming I would build the edit differently from
-the start.
+**6. Is the name the only editable field, or the first of many?** A one field form and a
+ten field form are different things, and I would build this differently from the start.
 
-**7. Who is allowed to edit, and do we need roles?** It changes what the interface shows or
-hides, and it changes what the API has to return.
+**7. Who is allowed to edit, and do we need roles?** It changes what the interface hides
+and what the API has to return.
 
-**8. Do we need a history of changes, who changed what and when?** An audit trail is a normal
-requirement for user management and it affects the data model, not just this screen.
+**8. Do we need an audit trail?** Normal for user management, and it lands on the data
+model rather than on this screen.
 
 **9. Do we need create and delete?** The screen is called user management, which promises
-more than the requirements ask for. I want to know whether that is the next iteration or
-deliberately out.
+more than the requirements ask for. Next iteration, or deliberately out?
 
-**10. Where does the city list come from, and is the filter single or multiple select?**
-Building it from the loaded users breaks the moment the data is paginated. If it is a real
-filter it needs its own endpoint.
+**10. Where does the city list come from, and is the filter single or multi select?**
+Building it from the loaded users breaks the moment the data is paged.
 
-**11. Should search also cover username, company or phone?** People expect search to find
-whatever they typed. Restricting it to two fields is a decision, not an obvious default.
+**11. Should search cover username, company or phone too?** People expect search to find
+whatever they typed. Two fields is a decision, not a default.
 
-**12. Which browsers, devices and accessibility level do we support?** WCAG AA, screen
-readers and older browsers all change the estimate, and I would rather know before the screen
-is built than after.
+**12. Which browsers, devices and accessibility level?** WCAG AA, screen readers and older
+browsers each change the estimate, and I would rather know before the screen exists than
+after.
 
-**13. Will we need localisation and right to left?** It affects layout, formatting and the
+**13. Localisation and right to left?** Affects layout, date and name formatting, and the
 sorting collation. Far cheaper to know now than to retrofit.
 
-**14. Does this have to work offline?** This is the only question that would make me choose
-IndexedDB over `localStorage`, so I want the answer before picking the storage.
-
-## A note on AI
-
-`AI/context.md` is the brief I use when an assistant works in this repo. It was written
-before the code, at the same time as this README, and updated once at the end of the day, so
-the git history shows it growing with the project rather than being written about it
-afterwards.
+**14. Does this have to work offline?** The only question that would make me choose
+IndexedDB over `localStorage`, so I want it answered before picking the storage.
