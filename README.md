@@ -600,13 +600,6 @@ the users currently in memory. That is correct while the whole dataset is on the
 wrong the moment it is paginated on a server. The wrongness is quiet, which is the bad part:
 the filter simply stops offering cities that exist, and nothing looks broken.
 
-**A failed background refresh is silent.** When a cached view goes stale and its refresh
-fails, TanStack Query keeps the data it already has rather than blanking the screen, which
-is right. But nothing tells the user their rows are now older than they look, so they can
-sit on stale data indefinitely with a working-looking interface. Found while testing the
-error state: breaking the network and re-requesting a cached view changes nothing on
-screen. A real product would show a quiet "could not refresh" marker with a retry.
-
 **One long value used to break the layout for every row, and still can.** The table has
 `white-space: nowrap` and a minimum width, so a very long name or email makes its column
 wide and squeezes the others. Measured with a 120 character name: the table went from 974px

@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { memo, useEffect, useRef, useState } from 'react';
 import Box from '@mui/material/Box';
 import IconButton from '@mui/material/IconButton';
 import InputAdornment from '@mui/material/InputAdornment';
@@ -6,14 +6,20 @@ import MenuItem from '@mui/material/MenuItem';
 import Stack from '@mui/material/Stack';
 import TextField from '@mui/material/TextField';
 import { useDebouncedValue } from '@/shared/lib/useDebouncedValue';
-import type { UsersFiltersQueryPatch, UsersQuery } from '../model/types';
+import type { UsersFiltersQueryPatch } from '../model/types';
 
 const SEARCH_DEBOUNCE_MS = 300;
 
 const ALL_CITIES = '';
 
+/**
+ * Only what this component displays, not the whole query. Taking `query` would mean a
+ * new prop on every sort and every page change, neither of which it shows, and memoising
+ * it would achieve nothing.
+ */
 type UsersFiltersProps = {
-  query: UsersQuery;
+  search: string;
+  city: string | null;
   cities: string[];
   /** The cities request failed, so the dropdown is empty for a reason worth saying. */
   citiesFailed: boolean;
@@ -28,8 +34,9 @@ const searchSx = {
 };
 const citySx = { minWidth: { xs: '100%', sm: 220 } };
 
-export function UsersFilters({
-  query,
+export const UsersFilters = memo(function UsersFilters({
+  search,
+  city,
   cities,
   citiesFailed,
   onQueryChange,
@@ -37,14 +44,14 @@ export function UsersFilters({
   /* The field owns its value so typing is instant. Only the write to the URL is
      debounced, because a text box that lags behind the keyboard is worse than anything
      debouncing fixes. */
-  const [text, setText] = useState(query.search);
+  const [text, setText] = useState(search);
   const debounced = useDebouncedValue(text, SEARCH_DEBOUNCE_MS);
 
   /* The last search value that crossed between this field and the URL, in either
      direction. Without it the two effects below echo each other: pressing back changes
      the URL, the field adopts it, the debounce then fires with the value the user just
      navigated away from, and it is written straight back. */
-  const settled = useRef(query.search);
+  const settled = useRef(search);
 
   useEffect(() => {
     if (debounced === settled.current) {
@@ -55,21 +62,19 @@ export function UsersFilters({
   }, [debounced, onQueryChange]);
 
   useEffect(() => {
-    if (query.search === settled.current) {
+    if (search === settled.current) {
       return;
     }
-    settled.current = query.search;
-    setText(query.search);
-  }, [query.search]);
+    settled.current = search;
+    setText(search);
+  }, [search]);
 
   /* A city from the URL that is not in the list yet, because the cities are still
      loading. Without this the select is handed a value it has no option for, which MUI
      reports as out of range and renders as empty, so a shared link looks like it lost
      its filter. */
   const cityOptions =
-    query.city !== null && !cities.includes(query.city)
-      ? [query.city, ...cities]
-      : cities;
+    city !== null && !cities.includes(city) ? [city, ...cities] : cities;
 
   return (
     <Box role="search">
@@ -108,7 +113,7 @@ export function UsersFilters({
         <TextField
           select
           label="City"
-          value={query.city ?? ALL_CITIES}
+          value={city ?? ALL_CITIES}
           onChange={(event) =>
             onQueryChange({
               city: event.target.value === ALL_CITIES ? null : event.target.value,
@@ -129,4 +134,4 @@ export function UsersFilters({
       </Stack>
     </Box>
   );
-}
+});

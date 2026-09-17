@@ -38,35 +38,37 @@ export function useUsersParams() {
   // so without memoising it every render would look like a different view.
   const query = useMemo(() => parseUsersQuery(searchParams), [searchParams]);
 
-  /* `historyModeFor` needs the current query, but depending on it directly would make
-     `setQuery` a new function after every change. Consumers hold it in effect dependency
-     arrays, so that would re-run those effects on every change and leave correctness
-     resting on a guard inside them. Through a ref, `setQuery` is stable for the life of
-     the component and those effects run only when their own inputs change. */
-  const queryRef = useRef(query);
+  /* Both values `setQuery` needs change on every navigation: the query itself, and
+     react-router's `setSearchParams`, which is a new function each time the location
+     changes. Closing over either one would make `setQuery` a new function after every
+     change, which re-runs consumers' effects and defeats any memo below it. Measured
+     before this: a sort click re-rendered the filters because their `onQueryChange` prop
+     had a new identity, even though nothing they display had changed.
+
+     Read through a ref, `setQuery` is stable for the life of the component. */
+  const latest = useRef({ query, setSearchParams });
   useEffect(() => {
-    queryRef.current = query;
-  }, [query]);
+    latest.current = { query, setSearchParams };
+  });
 
-  const setQuery = useCallback(
-    (patch: Partial<UsersQuery>) => {
-      setSearchParams(
-        (current) => {
-          const next = { ...parseUsersQuery(current), ...patch };
+  const setQuery = useCallback((patch: Partial<UsersQuery>) => {
+    const { query: current, setSearchParams: write } = latest.current;
 
-          // Otherwise a search that now matches four rows leaves the user on page three
-          // looking at an empty table. A patch that sets `page` itself wins.
-          if (!('page' in patch)) {
-            next.page = DEFAULT_QUERY.page;
-          }
+    write(
+      (params) => {
+        const next = { ...parseUsersQuery(params), ...patch };
 
-          return usersQueryToParams(next);
-        },
-        historyModeFor(patch, queryRef.current),
-      );
-    },
-    [setSearchParams],
-  );
+        // Otherwise a search that now matches four rows leaves the user on page three
+        // looking at an empty table. A patch that sets `page` itself wins.
+        if (!('page' in patch)) {
+          next.page = DEFAULT_QUERY.page;
+        }
+
+        return usersQueryToParams(next);
+      },
+      historyModeFor(patch, current),
+    );
+  }, []);
 
   return { query, setQuery };
 }

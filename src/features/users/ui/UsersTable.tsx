@@ -1,4 +1,5 @@
-import type { ReactNode } from 'react';
+import Alert from '@mui/material/Alert';
+import Button from '@mui/material/Button';
 import Paper from '@mui/material/Paper';
 import Skeleton from '@mui/material/Skeleton';
 import Table from '@mui/material/Table';
@@ -10,55 +11,54 @@ import TablePagination from '@mui/material/TablePagination';
 import TableRow from '@mui/material/TableRow';
 import TableSortLabel from '@mui/material/TableSortLabel';
 import { LiveRegion } from '@/shared/ui/LiveRegion';
+import { StatusBlock } from '@/shared/ui/StatusBlock';
 import { PAGE_SIZE_OPTIONS } from '../constants/pagination';
 import { SORTABLE_COLUMN_ID, USERS_COLUMNS } from '../constants/usersColumns';
-import type { User, UsersQuery, UsersTableQueryPatch } from '../model/types';
+import type { UsersQuery, UsersTableQueryPatch } from '../model/types';
 import { toPageSize } from '../model/usersParams';
+import type { UsersViewState } from '../model/usersViewState';
 import { UsersTableRow } from './UsersTableRow';
 
+/** The error state replaces the table rather than appearing inside it. */
+type UsersTableState = Exclude<UsersViewState, { status: 'error' }>;
+
 type UsersTableProps = {
-  users: User[];
-  total: number;
+  state: UsersTableState;
   query: UsersQuery;
   onQueryChange: (patch: UsersTableQueryPatch) => void;
-  isLoading: boolean;
-  /** The rows belong to the previous query and a newer one is in flight. */
-  isStale: boolean;
-  /** Shown in place of rows when there are none. The screen decides which message. */
-  emptyState: ReactNode;
+  onClearFilters: () => void;
+  onRetry: () => void;
 };
 
 const paperSx = { overflow: 'hidden' } as const;
 const pageSizes = [...PAGE_SIZE_OPTIONS];
 
-/**
- * Presentational. Handed rows and a query, reports changes back, so it renders in a test
- * with no router and no network.
- */
 export function UsersTable({
-  users,
-  total,
+  state,
   query,
   onQueryChange,
-  isLoading,
-  isStale,
-  emptyState,
+  onClearFilters,
+  onRetry,
 }: UsersTableProps) {
-  const isEmpty = !isLoading && users.length === 0;
+  const total = state.status === 'ready' ? state.total : 0;
+  const isRefreshing = state.status === 'ready' && state.isRefreshing;
 
   return (
     <Paper variant="outlined" sx={paperSx}>
-      <LiveRegion
-        message={
-          isLoading
-            ? 'Loading users'
-            : // Grouped, because "100000 users" is read out as a digit stream while
-              // the pagination beside it already says "of 100,000".
-              `${total.toLocaleString()} ${total === 1 ? 'user' : 'users'}, sorted by name, ${
-                query.sort === 'asc' ? 'ascending' : 'descending'
-              }`
-        }
-      />
+      <LiveRegion message={announce(state, query)} />
+
+      {state.status === 'ready' && state.refreshFailed && (
+        <Alert
+          severity="warning"
+          action={
+            <Button color="inherit" size="small" onClick={onRetry}>
+              Retry
+            </Button>
+          }
+        >
+          Could not refresh. These rows may be out of date.
+        </Alert>
+      )}
 
       {/* Focusable and labelled, because a region that scrolls has to be reachable
           without a mouse. Below the table's minimum width this is what the user drags. */}
@@ -69,16 +69,13 @@ export function UsersTable({
           sx={{
             // Below this the columns squeeze until the text wraps, which makes rows
             // taller than the loading skeleton and moves everything under the table.
-            // Scrolling sideways is the honest answer for four columns on a phone.
             minWidth: 640,
-            // Every row is exactly one line. A wrapped cell makes its row taller than
-            // the loading skeleton, which moves everything below the table when the data
-            // arrives. Scrolling is better than truncating here: a half shown email
-            // address is not something a user can read.
+            // Every row is exactly one line, so a wrapped cell cannot make its row taller
+            // than the skeleton and shift the layout when the data arrives.
             '& th, & td': { whiteSpace: 'nowrap' },
             // Dimmed rather than replaced, so the table does not flash empty between
             // queries and the layout does not jump.
-            opacity: isStale ? 0.5 : 1,
+            opacity: isRefreshing ? 0.5 : 1,
             transition: 'opacity 150ms',
           }}
         >
@@ -115,7 +112,7 @@ export function UsersTable({
           </TableHead>
 
           <TableBody>
-            {isLoading &&
+            {state.status === 'loading' &&
               Array.from({ length: query.pageSize }, (_, rowIndex) => (
                 <TableRow key={rowIndex}>
                   {USERS_COLUMNS.map((column) => (
@@ -126,15 +123,28 @@ export function UsersTable({
                 </TableRow>
               ))}
 
-            {!isLoading &&
-              users.map((user) => <UsersTableRow key={user.id} user={user} />)}
+            {state.status === 'ready' &&
+              state.users.map((user) => <UsersTableRow key={user.id} user={user} />)}
           </TableBody>
         </Table>
       </TableContainer>
 
-      {/* Outside the scroll container on purpose. Inside it, the message would be
-          centred across the table's minimum width and sit off screen on a phone. */}
-      {isEmpty && emptyState}
+      {/* Outside the scroll container on purpose. Inside it the message would be centred
+          across the table's minimum width and sit off screen on a phone. */}
+      {state.status === 'empty' && (
+        <StatusBlock
+          title="No users yet"
+          description="Nobody has been added. When they are, they will appear here."
+        />
+      )}
+
+      {state.status === 'no-results' && (
+        <StatusBlock
+          title="No users match these filters"
+          description="Try a different search term, or clear the filters to see everyone."
+          action={<Button onClick={onClearFilters}>Clear filters</Button>}
+        />
+      )}
 
       <TablePagination
         component="div"
@@ -150,4 +160,22 @@ export function UsersTable({
       />
     </Paper>
   );
+}
+
+/** Sorting reorders rows silently for anyone who is not looking at the screen. */
+function announce(state: UsersTableState, query: UsersQuery): string {
+  switch (state.status) {
+    case 'loading':
+      return 'Loading users';
+    case 'empty':
+      return 'No users';
+    case 'no-results':
+      return 'No users match these filters';
+    case 'ready': {
+      const direction = query.sort === 'asc' ? 'ascending' : 'descending';
+      const noun = state.total === 1 ? 'user' : 'users';
+      // Grouped, because "100000 users" is read out as a digit stream.
+      return `${state.total.toLocaleString()} ${noun}, sorted by name, ${direction}`;
+    }
+  }
 }

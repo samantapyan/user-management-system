@@ -1,3 +1,4 @@
+import { memo } from 'react';
 import TableCell from '@mui/material/TableCell';
 import TableRow from '@mui/material/TableRow';
 import type { User } from '../model/types';
@@ -9,7 +10,12 @@ type UsersTableRowProps = {
 
 const rowHeaderSx = { fontWeight: 'medium' } as const;
 
-export function UsersTableRow({ user }: UsersTableRowProps) {
+/**
+ * Memoised because a row is a pure function of its user, and the table re-renders
+ * whenever anything around it changes. Measured: a sort click rendered ten rows whose
+ * props had not changed.
+ */
+export const UsersTableRow = memo(function UsersTableRow({ user }: UsersTableRowProps) {
   return (
     <TableRow hover>
       {USERS_COLUMNS.map((column) =>
@@ -23,4 +29,4 @@ export function UsersTableRow({ user }: UsersTableRowProps) {
       )}
     </TableRow>
   );
-}
+});
