@@ -9,18 +9,19 @@ rename them so the change survives a reload.
 
 ## Where each answer is
 
-| The task asks for                                | Section                             |
-| ------------------------------------------------ | ----------------------------------- |
-| The level I am applying for                      | top of this file                    |
-| How to run it                                    | Running it                          |
-| Which component or styling library, and why      | The stack, and why                  |
-| Edited users against fresh server data, and why  | Gap 2                               |
-| Devices, input methods and settings checked, how | Accessibility, devices and settings |
-| Gaps and contradictions in the requirements      | Gaps and contradictions             |
-| Assumptions made instead of asking               | Assumptions                         |
-| What is missing, and why                         | Tests                               |
-| What is still wrong with this                    | its own section                     |
-| What I would need before building this for real  | its own section                     |
+| The task asks for                                | Where it is                                                                                         |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| The level I am applying for                      | [top of this file](#user-management-panel)                                                          |
+| How to run it                                    | [Running it](#running-it)                                                                           |
+| Which component or styling library, and why      | [The stack, and why](#the-stack-and-why)                                                            |
+| Edited users against fresh server data, and why  | [Gaps, number 2](#2-rename-a-user-with-no-write-endpoint-and-which-data-wins)                       |
+| Devices, input methods and settings checked, how | [Accessibility, devices and settings](#accessibility-devices-and-settings)                          |
+| Gaps and contradictions in the requirements      | [Gaps and contradictions in the requirements](#gaps-and-contradictions-in-the-requirements)         |
+| Assumptions made instead of asking               | [Assumptions](#assumptions)                                                                         |
+| Tests, written or deliberately skipped           | [Tests](#tests)                                                                                     |
+| What is still wrong with this                    | [What is still wrong with this](#what-is-still-wrong-with-this)                                     |
+| What I would need before building this for real  | [What I would need before building this for real](#what-i-would-need-before-building-this-for-real) |
+| The brief I would hand an assistant              | [AI/context.md](AI/context.md)                                                                      |
 
 ## Running it
 

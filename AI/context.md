@@ -157,20 +157,20 @@ where a test goes.
 
 The files you are most likely to need, and what each one owns:
 
-| File                        | Owns                                                              |
-| --------------------------- | ----------------------------------------------------------------- |
-| `api/usersApi.ts`           | the only place the query work and the edit overlay are applied    |
-| `api/usersKeys.ts`          | every cache key, built from one root                              |
-| `model/queryUsers.ts`       | search, city filter, sort, paging: the work a server would do     |
-| `model/applyEdits.ts`       | merging local renames, and the order that has to happen in        |
-| `model/userEdits.ts`        | the rename store, `localStorage` backed                           |
-| `model/usersParams.ts`      | URL to typed query and back                                       |
-| `model/useUsersParams.ts`   | which changes get a history entry                                 |
-| `model/usersViewState.ts`   | which one state the screen is in                                  |
-| `model/schemas.ts`          | every zod schema: the API shape, the stored edits, the form rules |
-| `constants/usersColumns.ts` | the table's columns, declared once                                |
-| `shared/lib/http.ts`        | the only `fetch`, with the timeout and the error normalising      |
-| `shared/lib/storage.ts`     | versioned, validated `localStorage`                               |
+| File                            | Owns                                                              |
+| ------------------------------- | ----------------------------------------------------------------- |
+| `api/usersApi.ts`               | the only place the query work and the edit overlay are applied    |
+| `api/usersKeys.ts`              | every cache key, built from one root                              |
+| `model/queryUsers.ts`           | search, city filter, sort, paging: the work a server would do     |
+| `model/applyEdits.ts`           | merging local renames, and the order that has to happen in        |
+| `model/userEdits.ts`            | the rename store, `localStorage` backed                           |
+| `model/usersParams.ts`          | URL to typed query and back                                       |
+| `model/hooks/useUsersParams.ts` | which changes get a history entry                                 |
+| `model/usersViewState.ts`       | which one state the screen is in                                  |
+| `model/schemas.ts`              | every zod schema: the API shape, the stored edits, the form rules |
+| `constants/usersColumns.ts`     | the table's columns, declared once                                |
+| `shared/lib/http.ts`            | the only `fetch`, with the timeout and the error normalising      |
+| `shared/lib/storage.ts`         | versioned, validated `localStorage`                               |
 
 **Grouped by feature, not by file type.** A top level `components/`, `hooks/`, `utils/`
 works for five files and stops working somewhere around thirty screens, because from then
