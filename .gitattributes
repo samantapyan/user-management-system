@@ -1,0 +1,11 @@
+# Line endings are normalised to LF in the repository and on every checkout.
+# Without this, a clone on Windows gets CRLF, Prettier is configured for LF, and
+# `npm run format:check` fails on a tree nobody has touched.
+* text=auto eol=lf
+
+*.svg text eol=lf
+*.png binary
+*.jpg binary
+*.ico binary
+*.woff binary
+*.woff2 binary
