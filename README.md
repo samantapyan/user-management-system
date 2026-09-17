@@ -94,11 +94,49 @@ decided and I only need the mechanics under it. And if a company design system a
 existed, none of this applies and I would use that instead of bringing a second system into
 the product.
 
-**Planned, not yet installed:** TanStack Query for caching, retry and request cancellation;
-React Router to keep search, sort, filter, page and the opened user in the URL; React Hook
-Form and Zod for the rename form and for validating what comes back out of `localStorage`;
-Vitest and React Testing Library. Each of those lands in the commit that needs it, so the
-history shows why it arrived.
+**TanStack Query, for the request lifecycle.** It is not really a data fetcher. It is a
+cache with a request lifecycle attached, and the lifecycle is the part I wanted. Without it,
+`useEffect` and `useState` mean hand writing loading, error, retry, cancellation,
+deduplication and staleness for every call, and getting one of them subtly wrong per screen.
+
+The reason it is here rather than any of its alternatives is narrower than that. The
+requirement that a stale response must never overwrite a newer one is answered by the cache
+key. The whole query object is the key, so two views are two entries, and a slow answer for
+the older one cannot be written where the newer one lives. That is prevented by the shape of
+the cache, not by a check somebody remembers to write, so it holds for a race nobody
+predicted. `keepPreviousData` then gives paging that does not blank the table between pages,
+and the retry policy is where it is decided that a 404 is not worth asking again.
+
+What I considered instead: SWR, which is smaller and would have done the caching, but has
+less around mutations and cancellation, and the mutation path is where the rename goes.
+RTK Query, which is excellent and arrives with Redux, and a store is a large thing to adopt
+for one screen. Writing it by hand, which is the honest default for a single request and the
+wrong one the moment there are four states and a race.
+
+**Zod, for data that comes from outside.** TypeScript types are erased before the code runs,
+so `payload as User[]` is a promise the compiler cannot keep. It is true right up to the day
+the API changes a field, and then it fails as `undefined is not an object` three components
+away from the cause, which is the most expensive kind of bug to read.
+
+One schema gives both the runtime check and the type, so they cannot drift apart. It earns
+its place twice more later: the response schema drops fields the app should never carry, and
+the same approach validates what comes back out of `localStorage`, where the data was
+written by an older version of my own code and has to degrade to a default rather than crash
+the screen.
+
+What I considered instead: Valibot, which is meaningfully smaller and would be the right
+answer if bundle size were the binding constraint here. Hand written type guards, which are
+fine for one shape and unmaintainable by the third. And no validation at all, which is the
+common choice and the one that produces the error above.
+
+**What they cost.** Both together added 30kB raw and 9kB gzipped to the bundle, measured
+before and after rather than estimated. The whole app builds to 364kB raw and 116kB gzipped,
+most of which is MUI.
+
+**Planned, not yet installed:** React Router, to keep search, sort, filter, page and the
+opened user in the URL. React Hook Form, for the rename. Vitest and React Testing Library.
+Each lands in the commit that needs it, so the history shows why it arrived rather than a
+dependency list appearing on day one for reasons nobody can reconstruct.
 
 ## Gaps and contradictions in the requirements
 

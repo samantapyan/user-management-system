@@ -15,6 +15,11 @@
     "noEmit": true,
     "jsx": "react-jsx",
 
+    /* One alias, so an import says which layer it crosses instead of how many
+       folders it climbed. Mirrored in vite.config.ts. */
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] },
+
     /* Type safety. See README for why each of these is on from the first commit. */
     "strict": true,
     "noUncheckedIndexedAccess": true,
