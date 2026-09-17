@@ -12,6 +12,12 @@
     <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0C1017" />
 
     <meta name="description" content="User management for web applications." />
+
+    <!-- The API is on another origin, so the connection is opened while the bundle is
+         still parsing rather than after it. This is the default origin; if
+         VITE_API_BASE_URL points somewhere else the hint is simply unused. -->
+    <link rel="preconnect" href="https://jsonplaceholder.typicode.com" crossorigin />
+    <link rel="dns-prefetch" href="https://jsonplaceholder.typicode.com" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
 
     <title>Users</title>

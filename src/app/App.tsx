@@ -3,18 +3,17 @@ import Box from '@mui/material/Box';
 import Container from '@mui/material/Container';
 import Toolbar from '@mui/material/Toolbar';
 import Typography from '@mui/material/Typography';
+import { UsersScreen } from '@/features/users';
 
-/**
- * The application shell.
- *
- * One screen, a top bar, and content centred with a maximum width. There is no
- * sidebar on purpose: a sidebar promises navigation, and there is exactly one
- * screen here, so it would promise something that does not exist.
- */
+/** One screen: a top bar and content centred with a maximum width. */
 export function App() {
   return (
     <Box sx={{ minHeight: '100dvh', bgcolor: 'background.default' }}>
-      <AppBar position="static" color="default" elevation={0}>
+      {/* Transparent, not `default`. MUI's default AppBar colour is its own grey, which
+          was never coordinated with this theme's background, so it rendered as a faint
+          band a shade off the page. AppBar stays for the header element and the banner
+          landmark it gives a screen reader. */}
+      <AppBar position="static" color="transparent" elevation={0}>
         <Toolbar>
           <Typography variant="h1" component="h1">
             Users
@@ -23,7 +22,7 @@ export function App() {
       </AppBar>
 
       <Container component="main" maxWidth="lg" sx={{ py: 3 }}>
-        {/* The users feature lands here. */}
+        <UsersScreen />
       </Container>
     </Box>
   );

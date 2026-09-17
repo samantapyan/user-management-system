@@ -1,4 +1,13 @@
 {
   "files": [],
-  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }]
+  "references": [{ "path": "./tsconfig.app.json" }, { "path": "./tsconfig.node.json" }],
+
+  /* This file builds nothing, so these options do not affect `tsc -b`. They are here
+     because editors resolve against the nearest tsconfig.json, which is this one, and
+     without the alias they report every "@/..." import as a missing module even though
+     the compiler and the build resolve it. Kept identical to tsconfig.app.json. */
+  "compilerOptions": {
+    "baseUrl": ".",
+    "paths": { "@/*": ["src/*"] }
+  }
 }

@@ -46,6 +46,21 @@ code rather than reading the output.
 same pipeline. Development is esbuild plus native modules, production is Rollup. Something
 can work in one and not the other.
 
+If you changed anything that renders, measure it:
+
+```bash
+npm run build && npm run preview
+npx lighthouse http://localhost:4173 --view
+```
+
+Against the preview build, never the dev server. The dev server serves unbundled,
+unminified modules and scores around 64 for performance, which measures Vite rather than
+this app. That number has already fooled somebody once.
+
+A green Lighthouse is a floor, not a pass. It reported accessibility 100 while the sort
+header had no visible focus ring at all, because it cannot tell whether a focus style is
+actually visible. Tab through the screen yourself and look at where focus lands.
+
 ## Where code lives
 
 ```
@@ -55,21 +70,23 @@ src/
   app/                  what boots the application
     App.tsx             the screen shell: top bar, centred content
     providers.tsx       every provider in one place
+    queryClient.ts      cache, retry and staleness policy
+    router.tsx          the route table
+    RouteError.tsx      the last line of defence when a render throws
     theme.ts            the MUI theme
   features/
     users/              the whole product, one folder
       api/              everything that talks to the network
+      constants/        values the feature is configured by, not logic
       model/            logic with no JSX. This is the part worth testing
       ui/               components
       index.ts          the only file the outside may import
   shared/
+    config.ts           anything that changes between environments
     ui/                 components more than one feature would need
     lib/                helpers more than one feature would need
   test/                 setup and fixtures
 ```
-
-Only `src/app` exists so far. `features`, `shared` and `test` are empty and are in place so
-the first real file has an obvious home.
 
 **Grouped by feature, not by file type.** A top level `components/`, `hooks/`, `utils/`
 works for five files and stops working somewhere around thirty screens, because from then
@@ -107,6 +124,19 @@ here instead.
 need a third level, the feature probably wants splitting in two. A folder with one file in
 it is structure for its own sake.
 
+**6. Do not export something until a file outside this one imports it.** An export is a
+commitment that the symbol can no longer be renamed or reshaped without checking who
+depends on it. Adding the keyword later costs one keystroke. If a helper can only be
+tested by exporting it, test it through whatever does use it instead, or give it its own
+module with a real surface. `index.ts` is the same rule one level up.
+
+**7. The table's columns are defined once, in `constants/usersColumns.ts`.** Adding a
+column is one entry in that array and nothing else. If you find yourself editing the header, the row
+component and a skeleton to add one column, stop: that is the bug this file was created to
+remove, and a mismatch between them is only visible while data is loading, which is when
+nobody is looking. The same applies to anything else that would otherwise be declared in
+two places.
+
 ## Code conventions
 
 **TypeScript is strict and the flags are deliberate.** On top of `strict`:
@@ -123,9 +153,11 @@ compiler that is correct is the worst change you can make in this repo.
 unless it starts with an underscore. If you genuinely need an escape hatch, use
 `@ts-expect-error` with a sentence above it saying why, so the next person can judge it.
 
-**Comments say why, not what.** The code already says what it does. A comment earns its
-place by recording a decision, a constraint, or a trap. Do not add comments that restate
-the line below them.
+**Comments are rare and load bearing.** Keep one only if deleting it would let a competent
+developer confidently make a wrong change: a trap, a constraint that is not visible in the
+code, or a line that looks wrong and is right. Why a library or an approach was chosen goes
+in the README, not above the code. If a file is more than roughly fifteen percent comment
+it is arguing rather than explaining, and the comments are the part to cut.
 
 **Prettier owns formatting, ESLint owns correctness.** `eslint-config-prettier` is last in
 the config so the two do not argue. Never hand format code to make it look nicer, run
@@ -137,14 +169,18 @@ design system on top of MUI, stop.
 
 ## Things that look like help and are damage
 
-- **Adding a dependency.** The runtime install is React, React DOM, MUI and emotion, and
-  each one is argued for in the README. Adding a library to solve something small is a cost
-  the next person pays. Ask first.
+- **Adding a dependency.** The runtime install is React, React DOM, MUI, emotion, React
+  Router, TanStack Query and zod, and each one is argued for in the README. Adding a
+  library to solve something small is a cost the next person pays. Ask first.
 - **Adding a backend, authentication, or real persistence.** All explicitly out of scope.
-- **Tidying away the `.gitkeep` files, or flattening the folders** because the app is
-  currently small. The structure is the decision.
-- **Removing the loading, error and empty states** because the fixture API never fails.
-  They exist for the API this will meet, not the one it has.
+- **Writing a URL or any other per-environment value as a literal.** It goes in
+  `shared/config.ts`, read from `import.meta.env`, with the current value as the fallback.
+- **Deleting the loading, empty, no-results or error states** because the fixture always
+  succeeds. They exist for the API this will meet, not the one it has, and two of them are
+  reachable today with a query string.
+- **Flattening the folders** because the app is currently small. The structure is the
+  decision, and it is what makes the second feature a new folder rather than edits
+  everywhere.
 - **Turning off `exactOptionalPropertyTypes` or any other strict flag.**
 - **Disabling an ESLint rule inline** to get past an error, instead of fixing what the rule
   found.

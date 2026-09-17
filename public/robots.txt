@@ -1,0 +1,4 @@
+# A real deployment of an internal tool would block indexing here and sit behind
+# authentication. This is a public demo, so it is crawlable.
+User-agent: *
+Allow: /

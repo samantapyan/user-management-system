@@ -1,30 +1,18 @@
 import { createTheme } from '@mui/material/styles';
 
-/**
- * A small theme on top of MUI, not a design system.
- *
- * No design was provided, so the job here is to make a few deliberate decisions
- * and then stop. Everything in this file is either a decision I want to be able
- * to defend, or a setting that makes the app usable on a device or with a
- * setting I cannot see. Anything beyond that belongs to MUI and is left alone.
- */
+/** A small theme on top of MUI, not a design system. Reasoning is in the README. */
 
-/* One accent, used for interactive things only. Everything else is neutral.
-   An internal tool should look calm, and colour should mean "you can act here"
-   rather than decoration. The dark value is lighter than the light value on
-   purpose, because the same blue on a dark surface does not reach 4.5:1. */
+// The dark value is lighter than the light one because the same blue on a dark surface
+// does not reach 4.5:1.
 const accent = {
   light: '#1D4ED8',
   dark: '#8FAEFF',
 };
 
 export const theme = createTheme({
-  /* CSS variables with the media selector means light and dark are decided by
-     plain CSS media queries. No JavaScript runs to pick a scheme, so there is no
-     flash of the wrong one on first paint, and the app follows the operating
-     system setting without asking the user to set it twice.
-     A manual light/dark switch would need colorSchemeSelector: 'class' instead,
-     and somewhere to persist the choice. There is no requirement for one. */
+  // `media` means light and dark are plain CSS media queries. No JavaScript decides the
+  // scheme, so there is no flash of the wrong one on first paint. A manual switch would
+  // need `class` instead, plus somewhere to persist the choice.
   cssVariables: { colorSchemeSelector: 'media' },
 
   colorSchemes: {
@@ -49,13 +37,6 @@ export const theme = createTheme({
   shape: { borderRadius: 10 },
 
   typography: {
-    /* The font the operating system already has, not a downloaded one.
-       A web font here would be around 70kB and would cost either a flash of the
-       fallback or a moment of invisible text, to change nothing a user of this
-       screen cares about. The system stack paints on the first frame and looks
-       native on each platform. It also moves the app away from looking like a
-       stock Material demo, which is the main risk of taking a component library
-       when no design was provided. */
     fontFamily: [
       'system-ui',
       '-apple-system',
@@ -73,9 +54,8 @@ export const theme = createTheme({
   components: {
     MuiCssBaseline: {
       styleOverrides: {
-        /* Respect a reduced motion setting. MUI animates dialogs, ripples and
-           skeletons by default, and for some people that is not a preference,
-           it is a symptom. */
+        // MUI animates dialogs, ripples and skeletons by default, and for some people
+        // that is a symptom rather than a preference.
         '@media (prefers-reduced-motion: reduce)': {
           '*, *::before, *::after': {
             animationDuration: '0.01ms !important',
@@ -85,17 +65,12 @@ export const theme = createTheme({
           },
         },
 
-        /* On a touch screen every control is at least 44px tall. This is the
-           one place the whole app gets that, rather than each component
-           remembering. Pointer coarse means touch, so a mouse keeps the denser
-           layout it can actually hit. */
+        // Coarse pointer means touch, so a mouse keeps the denser layout it can hit.
         '@media (pointer: coarse)': {
           '.MuiButtonBase-root, .MuiInputBase-root': { minHeight: 44 },
         },
 
-        /* A focus ring that is visible on both schemes and on top of a coloured
-           button. The browser default disappears against the accent, and
-           keyboard users are the ones who need it. */
+        // The browser default ring disappears against the accent colour.
         '*:focus-visible': {
           outline: '3px solid var(--mui-palette-primary-main)',
           outlineOffset: '2px',
@@ -103,17 +78,39 @@ export const theme = createTheme({
       },
     },
 
-    MuiButton: {
-      defaultProps: { disableElevation: true },
+    // MUI's ButtonBase sets `outline: 0` on its root, which has the same specificity as
+    // the global rule above and is injected after it, so every button, sort label and
+    // icon button ends up with no visible focus at all. Repeating the ring here is more
+    // specific than that reset and wins without `!important`.
+    MuiButtonBase: {
+      styleOverrides: {
+        root: {
+          '&:focus-visible': {
+            outline: '3px solid var(--mui-palette-primary-main)',
+            outlineOffset: '2px',
+          },
+        },
+      },
     },
 
-    /* Small is the default input size because this screen is a dense list, not
-       a form. The touch rule above puts the height back on a phone. */
-    MuiTextField: {
-      defaultProps: { size: 'small' },
-    },
+    // The select inside the pagination is a div, not a button, so it misses the rule
+    // above and MUI only recolours an underline it does not draw here.
     MuiSelect: {
       defaultProps: { size: 'small' },
+      styleOverrides: {
+        select: {
+          '&:focus-visible': {
+            outline: '3px solid var(--mui-palette-primary-main)',
+            outlineOffset: '2px',
+            borderRadius: 4,
+          },
+        },
+      },
     },
+
+    MuiButton: { defaultProps: { disableElevation: true } },
+    // Dense by default because this screen is a list, not a form. The touch rule above
+    // puts the height back on a phone.
+    MuiTextField: { defaultProps: { size: 'small' } },
   },
 });

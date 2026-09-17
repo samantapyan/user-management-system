@@ -11,15 +11,9 @@ rename them so the change survives a reload.
 
 The decisions below are decided. Where something is not implemented yet, it says so.
 
-One section is missing: **Accessibility, devices and settings**, which lists what I actually
-checked and how, rather than what I assume works. Nothing has been checked yet, so there is
-nothing honest to put in it. It arrives when the checking does.
-
-**What is still wrong with this** is here and already has entries, and it grows as the code
-does rather than being collected at the end.
-
-If a section is still missing when you read this, that is what ran out of time, and it is
-said here rather than left for you to notice.
+Every section the task asks for is present. **What is still wrong with this** grows as the
+code does rather than being collected at the end, and **Accessibility, devices and settings**
+lists only what was actually checked, with what was not checked said out loud.
 
 ## Running it
 
@@ -37,6 +31,10 @@ npm run build        # tsc -b && vite build, output in dist/
 npm run preview      # serve the production build on http://localhost:4173
 npm run verify       # typecheck, then lint, then format check
 ```
+
+The API it points at is configuration, not a literal in the source. Copy `.env.example` to
+`.env.local` and set `VITE_API_BASE_URL` to use a different one. Unset, it uses the public
+fixture.
 
 `npm run build` runs the TypeScript compiler before Vite on purpose. Vite does not
 typecheck. It strips types with esbuild and never looks at them, so the dev server will
@@ -129,14 +127,46 @@ answer if bundle size were the binding constraint here. Hand written type guards
 fine for one shape and unmaintainable by the third. And no validation at all, which is the
 common choice and the one that produces the error above.
 
-**What they cost.** Both together added 30kB raw and 9kB gzipped to the bundle, measured
-before and after rather than estimated. The whole app builds to 364kB raw and 116kB gzipped,
-most of which is MUI.
+**React Router, for a screen with no routes.** This one I argued myself out of and then back
+into, so the reasoning is worth having.
 
-**Planned, not yet installed:** React Router, to keep search, sort, filter, page and the
-opened user in the URL. React Hook Form, for the rename. Vitest and React Testing Library.
-Each lands in the commit that needs it, so the history shows why it arrived rather than a
-dependency list appearing on day one for reasons nobody can reconstruct.
+The case against is real. There are no routes here, not few. The router resolves one path,
+and the only hook the screen needs from it is `useSearchParams`. About thirty lines on
+`useSyncExternalStore` and the History API would have done it, with nothing added to the
+bundle, and writing it demonstrates knowing why the naive version breaks: `pushState` and
+`replaceState` do not fire `popstate`, so anything hand rolled has to notify its own
+subscribers.
+
+Three things decided it the other way. The requirement that unsaved changes in the rename
+form are not silently lost is close to unimplementable without a router. `popstate` fires
+**after** the navigation has happened, so a back press cannot be cancelled, only undone by
+shoving a state back onto the stack and hoping. `useBlocker` stops it properly, and it is why
+this goes in as `createBrowserRouter` rather than the simpler `BrowserRouter`. Second, this
+is a user management panel and it will grow a second screen, at which point the route table
+gains a line instead of the app gaining a router. And third, consistency: the data layer is
+already written for the API this will meet rather than the fixture it has, and building the
+navigation for only the screen that exists today would contradict that in the same codebase.
+
+**What they cost.** Zod and TanStack Query together added 30kB raw and 9kB gzipped. React
+Router added 98kB raw and 31kB gzipped, which is the largest single cost in the project after
+MUI and by some distance the most arguable. All measured before and after, not estimated.
+
+The build splits dependencies from application code, because the two change at completely
+different rates and a deploy should not throw away a browser's cached copy of React:
+
+```
+index    10kB raw    5kB gzipped     the application
+vendor  136kB raw   40kB gzipped     zod, TanStack Query
+mui     229kB raw   72kB gzipped     MUI and emotion
+react   323kB raw  101kB gzipped     React, React DOM, React Router
+```
+
+218kB gzipped in total is a lot for one screen, and almost all of it is the component
+library. That is the price of the MUI decision above, stated rather than hidden.
+
+**Planned, not yet installed:** React Hook Form, for the rename. Vitest and React Testing
+Library. Each lands in the commit that needs it, so the history shows why it arrived rather
+than a dependency list appearing on day one for reasons nobody can reconstruct.
 
 ## Gaps and contradictions in the requirements
 
@@ -396,17 +426,19 @@ the default branch is the finished state and there is nothing to go looking for.
 
 ```
 src/
-  app/          what boots the application: shell, providers, theme
+  app/            what boots the application: shell, providers, router, theme
   features/
-    users/      the whole product in one folder
-      api/      everything that talks to the network
-      model/    logic with no JSX. The part worth testing
-      ui/       components
-      index.ts  the only file the outside may import
+    users/        the whole product in one folder
+      api/        everything that talks to the network
+      constants/  values the feature is configured by, not logic
+      model/      logic with no JSX. The part worth testing
+      ui/         components
+      index.ts    the only file the outside may import
   shared/
-    ui/         components more than one feature would need
-    lib/        helpers more than one feature would need
-  test/         setup and fixtures
+    config.ts     anything that changes between environments
+    ui/           components more than one feature would need
+    lib/          helpers more than one feature would need
+  test/           setup and fixtures
 ```
 
 Grouped by feature rather than by file type. A top level `components/`, `hooks/`, `utils/`
@@ -425,6 +457,71 @@ generated API client, Storybook, or a barrel file in every folder. At one screen
 folders with one file in them, which is cost with no benefit. The generated client starts to
 pay when there is a second consumer of the API, Storybook when someone other than me uses
 the components.
+
+## Accessibility, devices and settings
+
+Only what I actually did. Where I did not check something, it says so, because a list of
+assumptions dressed up as testing is worse than a short list.
+
+**Lighthouse**, against the production build on `npm run preview`, not the dev server. The
+dev server scores around 64 for performance because it ships unbundled, unminified modules,
+and measuring it tells you nothing about what users get.
+
+```
+                Performance  Accessibility  Best practices  SEO
+desktop             100           100            100        100
+mobile               89           100            100        100
+```
+
+Mobile performance is 89 because of script parse and execution on a throttled CPU, not
+because of anything on the screen. Largest Contentful Paint is 3.1s and Total Blocking Time
+is 200ms, and both are the cost of React, MUI and React Router being parsed before anything
+renders. That is the price of the library choices above, and the only real ways down from
+here are server rendering or fewer dependencies, both of which are decisions already made
+and explained.
+
+To reproduce any of this:
+
+```bash
+npm run build && npm run preview
+npx lighthouse http://localhost:4173 --view
+```
+
+**Sizes**, in Chrome: 375 x 812, 1024 x 768 and 1280 x 800. Below roughly 640px the table
+scrolls sideways inside its container rather than squeezing four columns into a phone, the
+page itself never scrolls sideways, and every row stays one line high.
+
+**Keyboard**, tabbing through the whole screen and recording where focus landed and what it
+looked like at each stop. Order is scroll region, then the sort header, then rows per page,
+then the pagination buttons when they are enabled. The scrollable table is reachable with a
+keyboard, which it is not by default: a container that scrolls but cannot be focused is
+unusable without a mouse.
+
+This is where the check earned its keep. MUI's `ButtonBase` sets `outline: 0` on its root,
+which has the same specificity as my global focus rule and is injected after it, so the sort
+header and the page size select had **no visible focus indicator at all**. Lighthouse scored
+accessibility 100 with that bug present, because it does not test whether a focus style is
+actually visible. It is fixed in the theme, and I only found it because I tabbed through and
+read the computed outline rather than trusting the score.
+
+**Colour scheme**, both light and dark through `prefers-color-scheme` emulation. Light and
+dark are CSS media queries with no JavaScript, so there is no flash of the wrong scheme.
+
+**Screen reader semantics**, checked in the DOM rather than with a reader: the sorted column
+carries `aria-sort`, each row's name is a `th scope="row"` so a cell is never read without a
+person attached to it, the result count and sort direction are announced through a polite
+live region, and the empty state's cell spans the real number of columns.
+
+### What I did not check
+
+- **A real screen reader.** No NVDA, VoiceOver or TalkBack. The semantics are right in the
+  markup, which is not the same as confirming they are announced usefully.
+- **A real phone or tablet.** Emulated viewports only, so no real touch targets, no real
+  scrolling feel, and no mobile Safari.
+- **`prefers-reduced-motion` with the setting actually on.** The rule is in the theme and in
+  the built CSS, but I did not toggle it at the operating system level and watch.
+- **Zoom at 200% and 400%**, and Windows High Contrast.
+- **Any browser except Chrome.** No Firefox, no Safari.
 
 ## Tests
 

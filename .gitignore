@@ -25,3 +25,8 @@ dist-ssr
 
 # Local agent and editor tooling, not part of the project.
 .claude/
+
+# Local environment. .env.example is committed, real values are not.
+.env
+.env.*
+!.env.example

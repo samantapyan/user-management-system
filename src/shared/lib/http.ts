@@ -1,30 +1,8 @@
-/**
- * The only place in this app that calls `fetch`.
- *
- * Everything above this file deals with `HttpError`, never with a `Response`, a
- * status code or a network exception. That is what lets a component show a
- * useful message without knowing anything about transport, and it is why the
- * rule is that nothing outside `api/` may call `fetch` directly.
- */
+/** The only place in the app that calls fetch. Everything above it sees HttpError. */
 
-/**
- * How long a request may take before we stop waiting.
- *
- * Without this, a slow network gives a spinner that never resolves and no way
- * back. Ten seconds is long enough that a slow connection still succeeds, and
- * short enough that a dead one does not hold the screen hostage.
- */
 const REQUEST_TIMEOUT_MS = 10_000;
 
-/**
- * Why a request failed, in terms the interface can act on.
- *
- * - `network`   the request never reached a server. Offline, DNS, CORS.
- * - `timeout`   a server was reached but did not answer in time.
- * - `status`    a server answered, and refused.
- * - `parse`     a server answered with something that is not usable JSON.
- */
-export type HttpErrorKind = 'network' | 'timeout' | 'status' | 'parse';
+type HttpErrorKind = 'network' | 'timeout' | 'status' | 'parse';
 
 type HttpErrorOptions = {
   status?: number;
@@ -33,12 +11,11 @@ type HttpErrorOptions = {
 
 export class HttpError extends Error {
   readonly kind: HttpErrorKind;
-  /** Only set when a server actually answered, so `kind` is `status`. */
+  /** Only set when a server answered, so when `kind` is `status`. */
   readonly status: number | undefined;
 
   constructor(kind: HttpErrorKind, message: string, options: HttpErrorOptions = {}) {
-    /* `exactOptionalPropertyTypes` means passing `{ cause: undefined }` is not
-       the same as passing nothing, and only the second one is allowed here. */
+    // exactOptionalPropertyTypes: `{ cause: undefined }` is not the same as passing nothing.
     super(message, options.cause === undefined ? undefined : { cause: options.cause });
     this.name = 'HttpError';
     this.kind = kind;
@@ -50,19 +27,20 @@ export function isHttpError(error: unknown): error is HttpError {
   return error instanceof HttpError;
 }
 
+/** What to put on screen. Anything unrecognised gets a message, never a stack trace. */
+export function errorMessage(error: unknown): string {
+  return isHttpError(error) ? error.message : 'Something went wrong.';
+}
+
 /**
- * GET a URL and hand back the parsed JSON body, unvalidated.
- *
- * The return type is `unknown` on purpose. This function knows how to talk to a
- * server, not what a server is supposed to say, so the caller validates the
- * body against a schema before anything treats it as data.
- *
- * `signal` is the caller's cancellation. If the caller aborts, the underlying
- * error is rethrown untouched rather than wrapped, because a cancelled request
- * is not a failed one and the query layer has to be able to tell them apart. A
- * cancellation turned into an error state would put "something went wrong" on
- * screen every time somebody types.
+ * Whether offering "try again" is honest. A malformed response will be malformed the
+ * second time too, so a retry button there is a button that does nothing.
  */
+export function isRetryable(error: unknown): boolean {
+  return !isHttpError(error) || error.kind !== 'parse';
+}
+
+/** Returns the body unvalidated. The caller owns the schema. */
 export async function getJson(url: string, signal?: AbortSignal): Promise<unknown> {
   const timeout = AbortSignal.timeout(REQUEST_TIMEOUT_MS);
   const combined = signal ? AbortSignal.any([signal, timeout]) : timeout;
@@ -81,6 +59,8 @@ export async function getJson(url: string, signal?: AbortSignal): Promise<unknow
         { cause: error },
       );
     }
+    // A cancelled request is not a failed one. Rethrown untouched so the query layer can
+    // tell them apart, otherwise every superseded keystroke puts an error on screen.
     if (signal?.aborted) {
       throw error;
     }

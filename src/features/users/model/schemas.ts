@@ -1,23 +1,11 @@
 import { z } from 'zod';
 import type { User } from './types';
 
-/**
- * What the API actually sends, and how it becomes a `User`.
- *
- * Validating a response the app did not produce is not ceremony. The fixture
- * returns ten well formed users today, but the code is written for an API that
- * can change under it, and the difference between a schema failure and no
- * schema is a clear error state against `undefined is not an object` three
- * components deeper.
- */
-
 const apiUserSchema = z.object({
   id: z.number().int(),
   name: z.string(),
   username: z.string(),
-  /* Not `z.email()`. A user whose address is malformed is still a user, and
-     rejecting the record would hide the whole row rather than one field. This
-     is display data, not something being sent anywhere. */
+  // Not z.email(). A malformed address would reject the record and hide the whole row.
   email: z.string(),
   phone: z.string(),
   website: z.string(),
@@ -31,11 +19,9 @@ const apiUserSchema = z.object({
 });
 
 /**
- * Unknown keys are dropped rather than rejected, which is zod's default and the
- * right one here. The response also carries `address.geo`, `company.catchPhrase`
- * and `company.bs`. Nothing needs them, so they never enter the application.
- * Rejecting on extra keys would also mean the app breaks the day the API adds a
- * field, which is the opposite of what validation is for.
+ * Unknown keys are dropped, not rejected. That is what keeps `address.geo`,
+ * `company.catchPhrase` and `company.bs` out of the app, and what stops a new field on
+ * the API from breaking it.
  */
 export const usersResponseSchema = z
   .array(apiUserSchema)

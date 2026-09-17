@@ -1,14 +1,13 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
-import { App } from './app/App';
+import { RouterProvider } from 'react-router';
 import { Providers } from './app/providers';
+import { router } from './app/router';
 
 const container = document.getElementById('root');
 
-/* The scaffold asserts this is not null. An assertion is a promise to the
-   compiler that I cannot keep, because whether the element exists depends on
-   index.html, not on the types. If the mount point is ever missing I want a
-   sentence that says so, not "cannot read properties of null". */
+// Whether this element exists depends on index.html, not on the types, so an assertion
+// here would be a promise the compiler cannot keep.
 if (!container) {
   throw new Error('Root element #root was not found in index.html');
 }
@@ -16,7 +15,7 @@ if (!container) {
 createRoot(container).render(
   <StrictMode>
     <Providers>
-      <App />
+      <RouterProvider router={router} />
     </Providers>
   </StrictMode>,
 );
